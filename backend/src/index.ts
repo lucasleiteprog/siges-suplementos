@@ -365,6 +365,78 @@ app.post('/api/patients', async (req, res) => {
   }
 });
 
+// ==========================================
+// DISPENSAÇÃO (ENTREGA FEFO)
+// ==========================================
+app.post('/api/dispense', async (req, res) => {
+  const { patient_id, formula_id, quantidade_solicitada, observacoes } = req.body;
+
+  try {
+    const result = await prisma.$transaction(async (tx) => {
+      // 1. Busca todos os lotes dessa fórmula com saldo > 0, ordenados do mais velho pro mais novo (FEFO)
+      const batches = await tx.batch.findMany({
+        where: { 
+          formulaId: parseInt(formula_id), 
+          quantidade_atual: { gt: 0 } 
+        },
+        orderBy: { data_validade: 'asc' }
+      });
+
+      const totalStock = batches.reduce((sum, b) => sum + b.quantidade_atual, 0);
+
+      if (totalStock < quantidade_solicitada) {
+        throw new Error(`Estoque insuficiente. Solicitado: ${quantidade_solicitada}. Disponível: ${totalStock}.`);
+      }
+
+      let qtdRestante = parseInt(quantidade_solicitada);
+      const historyRecords = [];
+      
+      // 2. Dar baixa nos lotes sequencialmente
+      for (const batch of batches) {
+        if (qtdRestante <= 0) break;
+        
+        const qtdParaTirar = Math.min(batch.quantidade_atual, qtdRestante);
+        
+        const updatedBatch = await tx.batch.update({
+          where: { id: batch.id },
+          data: { quantidade_atual: { decrement: qtdParaTirar } }
+        });
+        
+        if (updatedBatch.quantidade_atual < 0) {
+          throw new Error('Conflito de concorrência detectado no estoque. Tente novamente.');
+        }
+        
+        qtdRestante -= qtdParaTirar;
+        
+        historyRecords.push({
+          patient_id: parseInt(patient_id),
+          batch_id: batch.id,
+          quantidade: qtdParaTirar,
+          observacoes: observacoes || null
+        });
+      }
+
+      // 3. Registrar o Histórico de Dispensação
+      await tx.dispensingHistory.createMany({
+        data: historyRecords
+      });
+
+      // 4. Atualizar a última data de entrega do paciente
+      await tx.patient.update({
+        where: { id: parseInt(patient_id) },
+        data: { data_entrega: new Date() }
+      });
+
+      return { success: true, message: 'Dispensação realizada com sucesso usando método FEFO.' };
+    });
+
+    return res.status(200).json(result);
+
+  } catch (error: any) {
+    return res.status(400).json({ error: error.message || 'Erro interno na dispensação' });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });

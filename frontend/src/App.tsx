@@ -1,9 +1,10 @@
 import { Routes, Route, Link, useLocation } from 'react-router-dom';
-import { Users, PackageSearch, Settings } from 'lucide-react';
+import { Users, PackageSearch, Settings, Truck } from 'lucide-react';
 import { PatientRegistrationForm } from './components/PatientRegistration/PatientRegistrationForm';
 import { PatientList } from './components/PatientList/PatientList';
 import { AdminLists } from './components/AdminLists/AdminLists';
 import { StockEntry } from './components/StockEntry/StockEntry';
+import { Dispensing } from './components/Dispensing/Dispensing';
 
 function App() {
   const location = useLocation();
@@ -27,6 +28,15 @@ function App() {
           <Link to="/pacientes" className={getNavClass('/pacientes')}>
             <Users className="w-5 h-5 mr-3 opacity-90" />
             Pacientes
+          </Link>
+          <div className="pt-6 pb-2">
+            <p className="px-4 text-xs font-semibold text-blue-400 uppercase tracking-wider">
+              Dispensação
+            </p>
+          </div>
+          <Link to="/entregas" className={getNavClass('/entregas')}>
+            <Truck className="w-5 h-5 mr-3 opacity-90" />
+            Nova Entrega
           </Link>
           <div className="pt-6 pb-2">
             <p className="px-4 text-xs font-semibold text-blue-400 uppercase tracking-wider">
@@ -56,6 +66,7 @@ function App() {
           <Route path="/pacientes" element={<PatientList />} />
           <Route path="/pacientes/novo" element={<PatientRegistrationForm />} />
           <Route path="/pacientes/editar/:id" element={<PatientRegistrationForm />} />
+          <Route path="/entregas" element={<Dispensing />} />
           <Route path="/estoque" element={<StockEntry />} />
           <Route path="/admin/listas" element={<AdminLists />} />
         </Routes>
