@@ -369,7 +369,11 @@ app.post('/api/patients', async (req, res) => {
 // DISPENSAÇÃO (ENTREGA FEFO)
 // ==========================================
 app.post('/api/dispense', async (req, res) => {
-  const { patient_id, formula_id, quantidade_solicitada, observacoes } = req.body;
+  const { patient_id, formula_id, quantidade_solicitada, observacoes, quem_entregou, quem_recebeu } = req.body;
+
+  if (!quem_entregou || !quem_recebeu) {
+    return res.status(400).json({ error: 'É obrigatório informar quem entregou e quem recebeu.' });
+  }
 
   try {
     const result = await prisma.$transaction(async (tx) => {
@@ -412,6 +416,8 @@ app.post('/api/dispense', async (req, res) => {
           patient_id: parseInt(patient_id),
           batch_id: batch.id,
           quantidade: qtdParaTirar,
+          quem_entregou,
+          quem_recebeu,
           observacoes: observacoes || null
         });
       }

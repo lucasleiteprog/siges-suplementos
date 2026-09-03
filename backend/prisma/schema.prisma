@@ -86,12 +86,14 @@ model Patient {
 }
 
 model DispensingHistory {
-  id               Int      @id @default(autoincrement())
-  patient_id       Int
-  batch_id         Int
-  quantidade       Int
-  data_dispensacao DateTime @default(now())
-  observacoes      String?
-  patient          Patient  @relation(fields: [patient_id], references: [id])
-  batch            Batch    @relation(fields: [batch_id], references: [id])
+  id                     Int          @id @default(autoincrement())
+  patient_id             Int
+  batch_id               Int
+  quantidade             Int
+  quem_entregou          String
+  quem_recebeu           String
+  data_dispensacao       DateTime     @default(now())
+  observacoes            String?
+  patient                Patient      @relation(fields: [patient_id], references: [id])
+  batch                  Batch        @relation(fields: [batch_id], references: [id])
 }

@@ -8,6 +8,8 @@ export function Dispensing() {
   const [selectedPatient, setSelectedPatient] = useState<any | null>(null);
   const [selectedFormulaId, setSelectedFormulaId] = useState<string>('');
   const [quantity, setQuantity] = useState<string>('');
+  const [quemEntregou, setQuemEntregou] = useState<string>('');
+  const [quemRecebeu, setQuemRecebeu] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
@@ -49,7 +51,7 @@ export function Dispensing() {
 
   const handleDispense = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedPatient || !selectedFormulaId || !quantity) return;
+    if (!selectedPatient || !selectedFormulaId || !quantity || !quemEntregou || !quemRecebeu) return;
 
     setSubmitting(true);
     try {
@@ -59,7 +61,9 @@ export function Dispensing() {
         body: JSON.stringify({
           patient_id: selectedPatient.id,
           formula_id: selectedFormulaId,
-          quantidade_solicitada: quantity
+          quantidade_solicitada: quantity,
+          quem_entregou: quemEntregou,
+          quem_recebeu: quemRecebeu
         })
       });
 
@@ -67,6 +71,8 @@ export function Dispensing() {
       if (res.ok) {
         setSuccessMessage('Entrega realizada com sucesso! O estoque foi reduzido (FEFO) e o histórico gravado.');
         setQuantity('');
+        setQuemEntregou('');
+        setQuemRecebeu('');
         setSelectedFormulaId('');
         fetchBatches(); // Update stock immediately
         
@@ -220,6 +226,31 @@ export function Dispensing() {
                     </div>
                   </div>
 
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Quem entregou (Profissional)</label>
+                      <input 
+                        type="text" 
+                        required
+                        placeholder="Ex: João da Silva"
+                        value={quemEntregou}
+                        onChange={(e) => setQuemEntregou(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Quem recebeu (Retirante)</label>
+                      <input 
+                        type="text" 
+                        required
+                        placeholder="Ex: Maria (Mãe)"
+                        value={quemRecebeu}
+                        onChange={(e) => setQuemRecebeu(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Quantidade Entregue (Latas)</label>
                     <input 
@@ -240,7 +271,7 @@ export function Dispensing() {
 
                   <button 
                     type="submit" 
-                    disabled={submitting || !selectedFormulaId || !quantity}
+                    disabled={submitting || !selectedFormulaId || !quantity || !quemEntregou || !quemRecebeu}
                     className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white font-medium rounded-md shadow-sm transition-colors flex justify-center items-center"
                   >
                     {submitting ? 'Processando entrega...' : 'Confirmar Dispensação'}
