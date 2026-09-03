@@ -3,6 +3,7 @@ import { Users, PackageSearch, Settings } from 'lucide-react';
 import { PatientRegistrationForm } from './components/PatientRegistration/PatientRegistrationForm';
 import { PatientList } from './components/PatientList/PatientList';
 import { AdminLists } from './components/AdminLists/AdminLists';
+import { StockEntry } from './components/StockEntry/StockEntry';
 
 function App() {
   const location = useLocation();
@@ -55,7 +56,7 @@ function App() {
           <Route path="/pacientes" element={<PatientList />} />
           <Route path="/pacientes/novo" element={<PatientRegistrationForm />} />
           <Route path="/pacientes/editar/:id" element={<PatientRegistrationForm />} />
-          <Route path="/estoque" element={<div className="p-10 text-gray-500">Tela de estoque em construção...</div>} />
+          <Route path="/estoque" element={<StockEntry />} />
           <Route path="/admin/listas" element={<AdminLists />} />
         </Routes>
       </div>

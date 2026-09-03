@@ -97,10 +97,10 @@ export function PatientRegistrationForm() {
 
       setFormaAlimentacao(data.forma_alimentacao ? data.forma_alimentacao.split(',').map((s: string) => s.trim()) : []);
       setViaAcessoSonda(data.via_acesso_sonda ? data.via_acesso_sonda.split(',').map((s: string) => s.trim()) : []);
+      if (data.restricoes_clinicas) setSelectedRestrictions(data.restricoes_clinicas.split(',').map((s: string) => parseInt(s.trim())));
       
       if (data.diagnoses) setSelectedDiagnoses(data.diagnoses);
       if (data.formulas) setSelectedFormulas(data.formulas);
-      // We don't save restrictions in DB yet based on schema, assuming omitted for now or added later.
 
     } catch (error) {
       console.error(error);
@@ -239,6 +239,7 @@ export function PatientRegistrationForm() {
       imc: imc ? parseFloat(imc) : null,
       forma_alimentacao: formaAlimentacao.length > 0 ? formaAlimentacao.join(', ') : null,
       via_acesso_sonda: viaAcessoSonda.length > 0 ? viaAcessoSonda.join(', ') : null,
+      restricoes_clinicas: selectedRestrictions.length > 0 ? selectedRestrictions.join(',') : null,
       quantidade: parseInt(formData.quantidade) || null,
       diagnosticos: selectedDiagnoses.map(d => d.id),
       formulas: selectedFormulas.map(f => f.id),

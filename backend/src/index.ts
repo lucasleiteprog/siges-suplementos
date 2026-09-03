@@ -155,6 +155,66 @@ app.delete('/api/formulas/:id', async (req, res) => {
 });
 
 // ==========================================
+// LOTES (ESTOQUE)
+// ==========================================
+app.get('/api/batches', async (req, res) => {
+  try {
+    const batches = await prisma.batch.findMany({
+      include: { formula: true },
+      orderBy: { data_validade: 'asc' } // FEFO logic
+    });
+    res.json(batches);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Erro ao buscar lotes' });
+  }
+});
+
+app.post('/api/batches', async (req, res) => {
+  try {
+    const data = req.body;
+    const batch = await prisma.batch.create({
+      data: {
+        formulaId: parseInt(data.formulaId),
+        numero_lote: data.numero_lote,
+        data_validade: new Date(data.data_validade),
+        quantidade_inicial: parseInt(data.quantidade_inicial),
+        quantidade_atual: parseInt(data.quantidade_inicial), // Starts equal
+        observacoes: data.observacoes || null
+      },
+      include: { formula: true }
+    });
+    res.status(201).json(batch);
+  } catch (error: any) {
+    if (error.code === 'P2002') return res.status(400).json({ error: 'Este lote já existe para esta fórmula.' });
+    res.status(500).json({ error: 'Erro ao criar lote', details: error.message });
+  }
+});
+
+app.put('/api/batches/:id', async (req, res) => {
+  try {
+    const data = req.body;
+    const batch = await prisma.batch.update({
+      where: { id: parseInt(req.params.id) },
+      data: {
+        numero_lote: data.numero_lote,
+        data_validade: new Date(data.data_validade),
+        quantidade_atual: parseInt(data.quantidade_atual),
+        observacoes: data.observacoes || null
+      },
+      include: { formula: true }
+    });
+    res.json(batch);
+  } catch (e) { res.status(500).json({ error: 'Erro ao atualizar lote' }); }
+});
+
+app.delete('/api/batches/:id', async (req, res) => {
+  try {
+    await prisma.batch.delete({ where: { id: parseInt(req.params.id) } });
+    res.status(204).send();
+  } catch (e) { res.status(500).json({ error: 'Erro ao excluir lote' }); }
+});
+
+// ==========================================
 // PACIENTES
 // ==========================================
 app.get('/api/patients', async (req, res) => {
@@ -218,6 +278,7 @@ app.put('/api/patients/:id', async (req, res) => {
           ubs_id: data.ubs_id ? parseInt(data.ubs_id) : null,
           cids: data.cids,
           observacoes: data.observacoes,
+          restricoes_clinicas: data.restricoes_clinicas,
           folder_id: data.folder_id ? parseInt(data.folder_id) : null,
           relatorio_medico: Boolean(data.relatorio_medico),
           relatorio_nutricional: Boolean(data.relatorio_nutricional),
@@ -267,6 +328,7 @@ app.post('/api/patients', async (req, res) => {
           ubs_id: data.ubs_id ? parseInt(data.ubs_id) : null,
           cids: data.cids,
           observacoes: data.observacoes,
+          restricoes_clinicas: data.restricoes_clinicas,
           folder_id: data.folder_id ? parseInt(data.folder_id) : null,
           relatorio_medico: Boolean(data.relatorio_medico),
           relatorio_nutricional: Boolean(data.relatorio_nutricional),
@@ -290,17 +352,6 @@ app.post('/api/patients', async (req, res) => {
         }
       });
 
-      if (data.restrictions && data.restrictions.length > 0) {
-        const restricoesData = data.restrictions.map((rId: number) => ({
-          patient_id: novoPaciente.id,
-          restriction_id: rId
-        }));
-        
-        await tx.patientRestriction.createMany({
-          data: restricoesData
-        });
-      }
-
       return novoPaciente;
     });
 
@@ -311,128 +362,6 @@ app.post('/api/patients', async (req, res) => {
       return res.status(400).json({ error: 'CPF ou Cartão SUS já cadastrados no sistema.' });
     }
     res.status(500).json({ error: 'Erro ao cadastrar paciente.' });
-  }
-});
-
-// ==========================================
-// DISPENSAÇÃO E ESTOQUE
-// ==========================================
-app.post('/api/dispense', async (req, res) => {
-  const { patient_id, prescription_id, quantidade_solicitada, confirmar_substituicao } = req.body;
-
-  try {
-    // UTILIZANDO TRANSAÇÃO INTERATIVA DO PRISMA
-    // Garante que todo o processo (leitura de estoque, dedução e histórico) seja atômico.
-    // Evita Race Conditions (dois atendentes dando baixa na mesma lata).
-    const result = await prisma.$transaction(async (tx) => {
-      
-      // 1. Busca e Validação da Prescrição e Laudo
-      const prescription = await tx.prescription.findUnique({
-        where: { id: prescription_id },
-        include: { report: true, alternatives: { orderBy: { ordem_prioridade: 'asc' } } }
-      });
-      
-      if (!prescription) throw new Error('Prescrição não encontrada');
-      if (new Date() > new Date(prescription.report.data_vencimento)) {
-        throw new Error('Laudo médico vencido (mais de 90 dias). Dispensação bloqueada.');
-      }
-
-      // 2. Cálculo do Saldo do Produto Principal (FEFO)
-      const mainBatches = await tx.batch.findMany({
-        where: { product_id: prescription.product_main_id, quantidade: { gt: 0 } },
-        orderBy: { data_validade: 'asc' }
-      });
-      const totalMainStock = mainBatches.reduce((sum, b) => sum + b.quantidade, 0);
-
-      let targetBatches: any[] = [];
-      let targetProductId = prescription.product_main_id;
-      let substituicao = false;
-
-      // Se há estoque do principal
-      if (totalMainStock >= quantidade_solicitada) {
-        targetBatches = mainBatches;
-      } else {
-        // 3. Lógica de Substituição se faltar o Principal
-        for (const alt of prescription.alternatives) {
-          const altBatches = await tx.batch.findMany({
-            where: { product_id: alt.product_alternative_id, quantidade: { gt: 0 } },
-            orderBy: { data_validade: 'asc' }
-          });
-          const totalAltStock = altBatches.reduce((sum, b) => sum + b.quantidade, 0);
-          
-          if (totalAltStock >= quantidade_solicitada) {
-             if (!confirmar_substituicao) {
-               // Interrompe a transação e avisa o frontend para pedir permissão ao usuário
-               throw new Error(`REQUIRE_SUBSTITUTION_CONFIRM:${alt.product_alternative_id}`);
-             }
-             targetBatches = altBatches;
-             targetProductId = alt.product_alternative_id;
-             substituicao = true;
-             break;
-          }
-        }
-        
-        if (targetBatches.length === 0) {
-           throw new Error('Estoque insuficiente para o produto principal e todas as alternativas autorizadas.');
-        }
-      }
-
-      // 4. Efetuar a baixa nos lotes (FEFO)
-      let qtdRestante = quantidade_solicitada;
-      const historyRecords = [];
-      
-      for (const batch of targetBatches) {
-        if (qtdRestante <= 0) break;
-        
-        const qtdParaTirar = Math.min(batch.quantidade, qtdRestante);
-        
-        // Atualiza a quantidade do lote
-        const updatedBatch = await tx.batch.update({
-          where: { id: batch.id },
-          data: { quantidade: { decrement: qtdParaTirar } }
-        });
-        
-        // Proteção extra: Prisma decrementa mesmo se for menor que 0 no SQLite.
-        // Se a transação simultânea fez o saldo ficar negativo, abortamos a transação inteira (Rollback).
-        if (updatedBatch.quantidade < 0) {
-          throw new Error('Conflito de concorrência detectado: O estoque esgotou durante a operação. Tente novamente.');
-        }
-        
-        qtdRestante -= qtdParaTirar;
-        
-        historyRecords.push({
-          patient_id,
-          prescription_id,
-          batch_id: batch.id,
-          product_dispensed_id: targetProductId,
-          quantidade: qtdParaTirar,
-          substituicao_realizada: substituicao
-        });
-      }
-
-      // 5. Registrar Histórico
-      await tx.dispensingHistory.createMany({
-        data: historyRecords
-      });
-
-      return { success: true, substituicao, targetProductId };
-    });
-
-    return res.status(200).json(result);
-
-  } catch (error: any) {
-    // Tratar o "Erro" controlado de sugestão de substituição
-    if (error.message && error.message.startsWith('REQUIRE_SUBSTITUTION_CONFIRM:')) {
-      const altId = error.message.split(':')[1];
-      return res.status(200).json({
-        require_confirmation: true,
-        suggested_alternative_id: parseInt(altId, 10),
-        message: 'O suplemento principal está sem estoque. Deseja utilizar a alternativa autorizada da prescrição?'
-      });
-    }
-    
-    // Retornar erros reais (Laudo vencido, sem estoque, etc)
-    return res.status(400).json({ error: error.message || 'Erro interno na transação de dispensação' });
   }
 });
 
