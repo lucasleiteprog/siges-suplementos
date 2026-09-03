@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 
 interface Entity { id: number; nome: string; }
 
@@ -10,6 +11,10 @@ const RESTRICTIONS_MOCK: Entity[] = [
 ];
 
 export function PatientRegistrationForm() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const isEditing = !!id;
+
   const [formData, setFormData] = useState({
     nome: '', cpf: '', cartao_sus: '', data_nascimento: '',
     endereco: '', bairro: '', visita_social: false,
@@ -24,7 +29,6 @@ export function PatientRegistrationForm() {
   const [viaAcessoSonda, setViaAcessoSonda] = useState<string[]>([]);
   const [selectedRestrictions, setSelectedRestrictions] = useState<number[]>([]);
   
-  // States para as entidades de busca
   const [diagnoses, setDiagnoses] = useState<Entity[]>([]);
   const [selectedDiagnoses, setSelectedDiagnoses] = useState<Entity[]>([]);
   const [isDiagnosisModalOpen, setIsDiagnosisModalOpen] = useState(false);
@@ -56,7 +60,67 @@ export function PatientRegistrationForm() {
     fetchData('/api/folders', setFolders);
     fetchData('/api/ubs', setUbsList);
     fetchData('/api/formulas', setFormulas);
-  }, []);
+
+    if (id) {
+      loadPatientData(id);
+    }
+  }, [id]);
+
+  const loadPatientData = async (patientId: string) => {
+    try {
+      const res = await fetch(`/api/patients/${patientId}`);
+      if (!res.ok) throw new Error('Erro ao buscar paciente');
+      const data = await res.json();
+      
+      setFormData({
+        nome: data.nome || '',
+        cpf: data.cpf || '',
+        cartao_sus: data.cartao_sus || '',
+        data_nascimento: data.data_nascimento ? new Date(data.data_nascimento).toISOString().split('T')[0] : '',
+        endereco: data.endereco || '',
+        bairro: data.bairro || '',
+        ubs_id: data.ubs_id ? data.ubs_id.toString() : '',
+        folder_id: data.folder_id ? data.folder_id.toString() : '',
+        cids: data.cids || '',
+        observacoes: data.observacoes || '',
+        visita_social: Boolean(data.visita_social),
+        relatorio_medico: Boolean(data.relatorio_medico),
+        relatorio_nutricional: Boolean(data.relatorio_nutricional),
+        peso: data.peso ? data.peso.toString() : '',
+        altura: data.altura ? data.altura.toString() : '',
+        nome_profissional: data.nome_profissional || '',
+        registro_profissional: data.registro_profissional || '',
+        quantidade: data.quantidade ? data.quantidade.toString() : '',
+        data_ultimo_relatorio: data.data_ultimo_relatorio ? new Date(data.data_ultimo_relatorio).toISOString().split('T')[0] : '',
+        data_entrega: data.data_entrega ? new Date(data.data_entrega).toISOString().split('T')[0] : '',
+      });
+
+      setFormaAlimentacao(data.forma_alimentacao ? data.forma_alimentacao.split(',').map((s: string) => s.trim()) : []);
+      setViaAcessoSonda(data.via_acesso_sonda ? data.via_acesso_sonda.split(',').map((s: string) => s.trim()) : []);
+      
+      if (data.diagnoses) setSelectedDiagnoses(data.diagnoses);
+      if (data.formulas) setSelectedFormulas(data.formulas);
+      // We don't save restrictions in DB yet based on schema, assuming omitted for now or added later.
+
+    } catch (error) {
+      console.error(error);
+      alert('Erro ao carregar os dados do paciente.');
+    }
+  };
+
+  useEffect(() => {
+    if (formData.folder_id && folders.length > 0) {
+      const found = folders.find(f => f.id.toString() === formData.folder_id);
+      if (found) setSearchFolder(found.nome);
+    }
+  }, [formData.folder_id, folders]);
+
+  useEffect(() => {
+    if (formData.ubs_id && ubsList.length > 0) {
+      const found = ubsList.find(u => u.id.toString() === formData.ubs_id);
+      if (found) setSearchUbs(found.nome);
+    }
+  }, [formData.ubs_id, ubsList]);
 
   const fetchData = async (url: string, setter: React.Dispatch<React.SetStateAction<any[]>>) => {
     try {
@@ -105,15 +169,6 @@ export function PatientRegistrationForm() {
     !selectedFormulas.some(sf => sf.id === f.id)
   );
 
-  const imc = useMemo(() => {
-    if (!formData.peso || !formData.altura) return '';
-    const p = parseFloat(formData.peso.replace(',', '.'));
-    let a = parseFloat(formData.altura.replace(',', '.'));
-    if (isNaN(p) || isNaN(a) || a === 0) return '';
-    if (a > 3) a = a / 100;
-    return (p / (a * a)).toFixed(2);
-  }, [formData.peso, formData.altura]);
-
   const idadePreview = useMemo(() => {
     if (!formData.data_nascimento) return null;
     const birthDate = new Date(formData.data_nascimento);
@@ -129,19 +184,26 @@ export function PatientRegistrationForm() {
     return age;
   }, [formData.data_nascimento]);
 
+  const imc = useMemo(() => {
+    if (!formData.peso || !formData.altura) return '';
+    const p = parseFloat(formData.peso.replace(',', '.'));
+    let a = parseFloat(formData.altura.replace(',', '.'));
+    if (isNaN(p) || isNaN(a) || a === 0) return '';
+    if (a > 3) a = a / 100;
+    return (p / (a * a)).toFixed(2);
+  }, [formData.peso, formData.altura]);
+
   const imcClassification = useMemo(() => {
     if (!imc) return '';
     const val = parseFloat(imc);
     const age = idadePreview;
 
-    // Classificação OPAS (Organização Pan-Americana da Saúde) / Lipschitz para Idosos (> 60 anos)
     if (age !== null && age >= 60) {
       if (val < 22) return 'Baixo peso (Desnutrição)';
       if (val <= 27) return 'Eutrofia (Peso adequado)';
       return 'Excesso de peso';
     }
 
-    // Classificação OMS detalhada para Adultos
     if (val < 16) return 'Baixo peso Grau III (Magreza Severa)';
     if (val < 17) return 'Baixo peso Grau II (Magreza Moderada)';
     if (val < 18.5) return 'Baixo peso Grau I (Magreza Leve)';
@@ -175,41 +237,27 @@ export function PatientRegistrationForm() {
       peso: formData.peso ? parseFloat(formData.peso.replace(',', '.')) : null,
       altura: formData.altura ? parseFloat(formData.altura.replace(',', '.')) : null,
       imc: imc ? parseFloat(imc) : null,
-      forma_alimentacao: formaAlimentacao.join(', '),
-      via_acesso_sonda: viaAcessoSonda.join(', '),
+      forma_alimentacao: formaAlimentacao.length > 0 ? formaAlimentacao.join(', ') : null,
+      via_acesso_sonda: viaAcessoSonda.length > 0 ? viaAcessoSonda.join(', ') : null,
       quantidade: parseInt(formData.quantidade) || null,
-      restrictions: selectedRestrictions,
       diagnosticos: selectedDiagnoses.map(d => d.id),
       formulas: selectedFormulas.map(f => f.id),
     };
     
     try {
-      const response = await fetch('/api/patients', {
-        method: 'POST',
+      const url = isEditing ? `/api/patients/${id}` : '/api/patients';
+      const method = isEditing ? 'PUT' : 'POST';
+
+      const response = await fetch(url, {
+        method: method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error || 'Erro ao cadastrar paciente');
+      if (!response.ok) throw new Error(result.error || 'Erro ao salvar paciente');
 
-      alert('Paciente cadastrado com sucesso!');
-      setFormData({ 
-        nome: '', cpf: '', cartao_sus: '', data_nascimento: '', 
-        endereco: '', bairro: '', ubs_id: '', visita_social: false,
-        cids: '', observacoes: '', folder_id: '',
-        relatorio_medico: false, relatorio_nutricional: false,
-        peso: '', altura: '', nome_profissional: '', registro_profissional: '',
-        data_ultimo_relatorio: '', quantidade: '', data_entrega: '' 
-      });
-      setSelectedRestrictions([]);
-      setSelectedDiagnoses([]);
-      setSelectedFormulas([]);
-      setFormaAlimentacao([]);
-      setViaAcessoSonda([]);
-      setSearchFolder('');
-      setSearchUbs('');
-      setSearchDiag('');
-      setSearchFormula('');
+      alert(isEditing ? 'Paciente atualizado com sucesso!' : 'Paciente cadastrado com sucesso!');
+      navigate('/pacientes');
     } catch (error: any) {
       alert(error.message);
     }
@@ -218,7 +266,9 @@ export function PatientRegistrationForm() {
   return (
     <>
       <div className="max-w-4xl mx-auto p-6 bg-white rounded-lg shadow-md mt-10 mb-20 relative">
-        <h2 className="text-2xl font-bold mb-6 text-gray-800 border-b pb-2">Cadastro de Paciente</h2>
+        <h2 className="text-2xl font-bold mb-6 text-gray-800 border-b pb-2">
+          {isEditing ? 'Editar Paciente' : 'Cadastro de Paciente'}
+        </h2>
         
         <form onSubmit={handleSubmit} className="space-y-8">
           
@@ -239,7 +289,14 @@ export function PatientRegistrationForm() {
                 <input type="text" name="cartao_sus" value={formData.cartao_sus} onChange={handleInputChange} required className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="000 0000 0000 0000"/>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Data Nasc.</label>
+                <div className="flex justify-between items-baseline mb-1">
+                  <label className="block text-sm font-medium text-gray-700">Data Nasc.</label>
+                  {idadePreview !== null && (
+                    <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
+                      {idadePreview} {idadePreview === 1 ? 'ano' : 'anos'}
+                    </span>
+                  )}
+                </div>
                 <input type="date" name="data_nascimento" value={formData.data_nascimento} onChange={handleInputChange} required className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"/>
               </div>
             </div>
@@ -369,7 +426,6 @@ export function PatientRegistrationForm() {
               </div>
             </div>
 
-            {/* Vias de Alimentação e Sonda */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
               <div className="p-4 border border-gray-200 rounded-md">
                 <label className="block text-sm font-semibold text-gray-700 mb-3">Forma de Alimentação</label>
@@ -464,7 +520,7 @@ export function PatientRegistrationForm() {
                   <input type="text" placeholder="Pesquise uma fórmula (ex: Padrão, Hipercalórica)..." value={searchFormula} onChange={(e) => { setSearchFormula(e.target.value); setIsFormulaDropdownOpen(true); }} onFocus={() => setIsFormulaDropdownOpen(true)} onBlur={() => setTimeout(() => setIsFormulaDropdownOpen(false), 200)} className="flex-1 px-3 py-2 border border-gray-300 rounded-l-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"/>
                   <button type="button" onClick={() => setIsFormulaModalOpen(true)} className="px-4 py-2 bg-gray-100 border-t border-r border-b border-gray-300 rounded-r-md text-gray-700 hover:bg-gray-200">+ Novo</button>
                   {isFormulaDropdownOpen && filteredFormulas.length > 0 && (
-                    <ul className="absolute z-10 w-full top-11 bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto">
+                    <ul className="absolute z-50 w-full bottom-full mb-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto">
                       {filteredFormulas.map(f => (
                         <li key={f.id} className="px-3 py-2 hover:bg-purple-50 cursor-pointer text-sm border-b border-gray-50 last:border-0" onMouseDown={(e) => { e.preventDefault(); setSelectedFormulas(prev => [...prev, f]); setSearchFormula(''); setIsFormulaDropdownOpen(false); }}>{f.nome}</li>
                       ))}
@@ -487,8 +543,15 @@ export function PatientRegistrationForm() {
           </div>
 
           <div className="flex justify-end space-x-3 pt-6 border-t mt-8">
+            <button 
+              type="button" 
+              onClick={() => navigate('/pacientes')} 
+              className="px-6 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 focus:outline-none font-medium"
+            >
+              Cancelar
+            </button>
             <button type="submit" className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 font-medium">
-              Salvar Paciente e Relatório
+              {isEditing ? 'Salvar Alterações' : 'Salvar Paciente'}
             </button>
           </div>
         </form>

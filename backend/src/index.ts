@@ -36,6 +36,18 @@ app.post('/api/diagnoses', async (req, res) => {
     res.status(500).json({ error: 'Erro ao criar diagnóstico' });
   }
 });
+app.put('/api/diagnoses/:id', async (req, res) => {
+  try {
+    const diag = await prisma.diagnosis.update({ where: { id: parseInt(req.params.id) }, data: { nome: req.body.nome } });
+    res.json(diag);
+  } catch (e) { res.status(500).json({ error: 'Erro' }); }
+});
+app.delete('/api/diagnoses/:id', async (req, res) => {
+  try {
+    await prisma.diagnosis.delete({ where: { id: parseInt(req.params.id) } });
+    res.status(204).send();
+  } catch (e) { res.status(500).json({ error: 'Erro' }); }
+});
 
 // ==========================================
 // PASTAS (FOLDERS)
@@ -58,6 +70,18 @@ app.post('/api/folders', async (req, res) => {
     if (error.code === 'P2002') return res.status(400).json({ error: 'Pasta já existe.' });
     res.status(500).json({ error: 'Erro ao criar pasta' });
   }
+});
+app.put('/api/folders/:id', async (req, res) => {
+  try {
+    const f = await prisma.folder.update({ where: { id: parseInt(req.params.id) }, data: { nome: req.body.nome } });
+    res.json(f);
+  } catch (e) { res.status(500).json({ error: 'Erro' }); }
+});
+app.delete('/api/folders/:id', async (req, res) => {
+  try {
+    await prisma.folder.delete({ where: { id: parseInt(req.params.id) } });
+    res.status(204).send();
+  } catch (e) { res.status(500).json({ error: 'Erro' }); }
 });
 
 // ==========================================
@@ -82,6 +106,18 @@ app.post('/api/ubs', async (req, res) => {
     res.status(500).json({ error: 'Erro ao criar UBS' });
   }
 });
+app.put('/api/ubs/:id', async (req, res) => {
+  try {
+    const u = await prisma.ubs.update({ where: { id: parseInt(req.params.id) }, data: { nome: req.body.nome } });
+    res.json(u);
+  } catch (e) { res.status(500).json({ error: 'Erro' }); }
+});
+app.delete('/api/ubs/:id', async (req, res) => {
+  try {
+    await prisma.ubs.delete({ where: { id: parseInt(req.params.id) } });
+    res.status(204).send();
+  } catch (e) { res.status(500).json({ error: 'Erro' }); }
+});
 
 // ==========================================
 // FÓRMULAS
@@ -105,10 +141,116 @@ app.post('/api/formulas', async (req, res) => {
     res.status(500).json({ error: 'Erro ao criar Fórmula' });
   }
 });
+app.put('/api/formulas/:id', async (req, res) => {
+  try {
+    const f = await prisma.formula.update({ where: { id: parseInt(req.params.id) }, data: { nome: req.body.nome } });
+    res.json(f);
+  } catch (e) { res.status(500).json({ error: 'Erro' }); }
+});
+app.delete('/api/formulas/:id', async (req, res) => {
+  try {
+    await prisma.formula.delete({ where: { id: parseInt(req.params.id) } });
+    res.status(204).send();
+  } catch (e) { res.status(500).json({ error: 'Erro' }); }
+});
 
 // ==========================================
 // PACIENTES
 // ==========================================
+app.get('/api/patients', async (req, res) => {
+  try {
+    const patients = await prisma.patient.findMany({
+      include: {
+        ubs: true,
+        folder: true,
+        diagnoses: true,
+        formulas: true
+      },
+      orderBy: { nome: 'asc' }
+    });
+    res.json(patients);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Erro ao buscar pacientes' });
+  }
+});
+
+app.get('/api/patients/:id', async (req, res) => {
+  try {
+    const patient = await prisma.patient.findUnique({
+      where: { id: parseInt(req.params.id) },
+      include: {
+        diagnoses: true,
+        formulas: true
+      }
+    });
+    if (!patient) return res.status(404).json({ error: 'Paciente não encontrado' });
+    res.json(patient);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Erro ao buscar paciente' });
+  }
+});
+
+app.put('/api/patients/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const data = req.body;
+    
+    const patient = await prisma.$transaction(async (tx) => {
+      // First, update basic fields and disconnect all relations to reset them
+      await tx.patient.update({
+        where: { id: parseInt(id) },
+        data: {
+          diagnoses: { set: [] },
+          formulas: { set: [] }
+        }
+      });
+
+      // Now update with new data
+      return await tx.patient.update({
+        where: { id: parseInt(id) },
+        data: {
+          nome: data.nome,
+          cpf: data.cpf,
+          cartao_sus: data.cartao_sus,
+          data_nascimento: new Date(data.data_nascimento),
+          endereco: data.endereco,
+          bairro: data.bairro,
+          ubs_id: data.ubs_id ? parseInt(data.ubs_id) : null,
+          cids: data.cids,
+          observacoes: data.observacoes,
+          folder_id: data.folder_id ? parseInt(data.folder_id) : null,
+          relatorio_medico: Boolean(data.relatorio_medico),
+          relatorio_nutricional: Boolean(data.relatorio_nutricional),
+          visita_social: Boolean(data.visita_social),
+          forma_alimentacao: data.forma_alimentacao,
+          via_acesso_sonda: data.via_acesso_sonda,
+          peso: data.peso ? parseFloat(data.peso) : null,
+          altura: data.altura ? parseFloat(data.altura) : null,
+          imc: data.imc ? parseFloat(data.imc) : null,
+          nome_profissional: data.nome_profissional,
+          registro_profissional: data.registro_profissional,
+          quantidade: data.quantidade,
+          data_entrega: data.data_entrega ? new Date(data.data_entrega) : null,
+          data_ultimo_relatorio: data.data_ultimo_relatorio ? new Date(data.data_ultimo_relatorio) : null,
+          diagnoses: {
+            connect: (data.diagnosticos || []).map((did: number) => ({ id: did }))
+          },
+          formulas: {
+            connect: (data.formulas || []).map((fid: number) => ({ id: fid }))
+          }
+        }
+      });
+    });
+    
+    res.json(patient);
+  } catch (error: any) {
+    if (error.code === 'P2002') {
+      return res.status(400).json({ error: 'CPF ou Cartão SUS já cadastrado.' });
+    }
+    res.status(500).json({ error: 'Erro ao atualizar paciente', details: error.message });
+  }
+});
+
 app.post('/api/patients', async (req, res) => {
   try {
     const data = req.body;
