@@ -10,6 +10,7 @@ export function Dispensing() {
   const [quantity, setQuantity] = useState<string>('');
   const [quemEntregou, setQuemEntregou] = useState<string>('');
   const [quemRecebeu, setQuemRecebeu] = useState<string>('');
+  const [observacoes, setObservacoes] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
@@ -43,6 +44,16 @@ export function Dispensing() {
     p.cpf.includes(searchQuery)
   );
 
+  let daysSinceDelivery = -1;
+  let isEarlyDelivery = false;
+  let isBlockedDelivery = false;
+
+  if (selectedPatient && selectedPatient.data_entrega) {
+    daysSinceDelivery = Math.floor((new Date().getTime() - new Date(selectedPatient.data_entrega).getTime()) / (1000 * 3600 * 24));
+    if (daysSinceDelivery < 25) isBlockedDelivery = true;
+    else if (daysSinceDelivery < 30) isEarlyDelivery = true;
+  }
+
   const getFormulaStock = (formulaId: number) => {
     return batches
       .filter(b => b.formulaId === formulaId && b.quantidade_atual > 0)
@@ -63,7 +74,8 @@ export function Dispensing() {
           formula_id: selectedFormulaId,
           quantidade_solicitada: quantity,
           quem_entregou: quemEntregou,
-          quem_recebeu: quemRecebeu
+          quem_recebeu: quemRecebeu,
+          observacoes: observacoes
         })
       });
 
@@ -73,6 +85,7 @@ export function Dispensing() {
         setQuantity('');
         setQuemEntregou('');
         setQuemRecebeu('');
+        setObservacoes('');
         setSelectedFormulaId('');
         fetchBatches(); // Update stock immediately
         
@@ -187,6 +200,26 @@ export function Dispensing() {
                 </div>
               )}
 
+              {isBlockedDelivery && (
+                <div className="mb-6 bg-red-50 border border-red-200 p-4 rounded-md flex">
+                  <AlertTriangle className="w-5 h-5 text-red-600 mr-2 flex-shrink-0" />
+                  <div>
+                    <span className="font-bold text-red-800 block">Dispensação Bloqueada (Menos de 25 dias)</span>
+                    <span className="text-sm text-red-700">A última entrega foi feita há apenas {daysSinceDelivery} dias ({new Date(selectedPatient.data_entrega).toLocaleDateString()}). O sistema não permite entregas com menos de 25 dias de intervalo.</span>
+                  </div>
+                </div>
+              )}
+
+              {isEarlyDelivery && !isBlockedDelivery && (
+                <div className="mb-6 bg-yellow-50 border border-yellow-200 p-4 rounded-md flex">
+                  <AlertTriangle className="w-5 h-5 text-yellow-600 mr-2 flex-shrink-0" />
+                  <div>
+                    <span className="font-bold text-yellow-800 block">Entrega Antecipada ({daysSinceDelivery} dias)</span>
+                    <span className="text-sm text-yellow-700">A última entrega foi feita há {daysSinceDelivery} dias. Para realizar esta entrega antes de fechar os 30 dias, é obrigatório preencher o motivo no campo de observações.</span>
+                  </div>
+                </div>
+              )}
+
               {(!selectedPatient.formulas || selectedPatient.formulas.length === 0) ? (
                 <div className="bg-orange-50 border border-orange-200 p-4 rounded-md flex">
                   <AlertTriangle className="w-5 h-5 text-orange-600 mr-2 flex-shrink-0" />
@@ -269,12 +302,28 @@ export function Dispensing() {
                     )}
                   </div>
 
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Observações {isEarlyDelivery ? <span className="text-red-500 font-bold">(Motivo da antecipação obrigatório)</span> : ''}</label>
+                    <textarea 
+                      rows={2}
+                      required={isEarlyDelivery}
+                      placeholder={isEarlyDelivery ? "Descreva o motivo da entrega antes dos 30 dias..." : "Anotações opcionais..."}
+                      value={observacoes}
+                      onChange={(e) => setObservacoes(e.target.value)}
+                      className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${isEarlyDelivery && !observacoes.trim() ? 'border-red-400 bg-red-50' : 'border-gray-300'}`}
+                    />
+                  </div>
+
                   <button 
                     type="submit" 
-                    disabled={submitting || !selectedFormulaId || !quantity || !quemEntregou || !quemRecebeu}
-                    className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white font-medium rounded-md shadow-sm transition-colors flex justify-center items-center"
+                    disabled={isBlockedDelivery || submitting || !selectedFormulaId || !quantity || !quemEntregou || !quemRecebeu || (isEarlyDelivery && !observacoes.trim())}
+                    className={`w-full py-3 px-4 font-medium rounded-md shadow-sm transition-colors flex justify-center items-center ${
+                      isBlockedDelivery 
+                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
+                        : 'bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white'
+                    }`}
                   >
-                    {submitting ? 'Processando entrega...' : 'Confirmar Dispensação'}
+                    {isBlockedDelivery ? 'Bloqueado (Aguarde o prazo)' : submitting ? 'Processando entrega...' : 'Confirmar Dispensação'}
                   </button>
                 </form>
               )}
