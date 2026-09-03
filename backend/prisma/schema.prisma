@@ -1,0 +1,164 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model Diagnosis {
+  id       Int       @id @default(autoincrement())
+  nome     String    @unique
+  patients Patient[]
+}
+
+model Folder {
+  id       Int       @id @default(autoincrement())
+  nome     String    @unique
+  patients Patient[]
+}
+
+model Ubs {
+  id       Int       @id @default(autoincrement())
+  nome     String    @unique
+  patients Patient[]
+}
+
+model Formula {
+  id       Int       @id @default(autoincrement())
+  nome     String    @unique
+  patients Patient[]
+}
+
+model Patient {
+  id               Int                  @id @default(autoincrement())
+  nome             String
+  cpf              String               @unique
+  cartao_sus       String               @unique
+  data_nascimento  DateTime
+  cids             String?              
+  observacoes      String?
+  diagnoses        Diagnosis[]
+  endereco         String?
+  bairro           String?
+  ubs_id           Int?
+  ubs              Ubs?                 @relation(fields: [ubs_id], references: [id])
+  folder_id        Int?
+  folder           Folder?              @relation(fields: [folder_id], references: [id])
+  relatorio_medico Boolean              @default(false)
+  relatorio_nutricional Boolean         @default(false)
+  visita_social    Boolean              @default(false)
+  forma_alimentacao String?
+  via_acesso_sonda  String?
+  peso             Float?
+  altura           Float?
+  imc              Float?
+  nome_profissional String?
+  registro_profissional String?
+  formulas         Formula[]
+  quantidade       Int?
+  data_entrega     DateTime?
+  data_ultimo_relatorio DateTime?
+  created_at       DateTime             @default(now())
+  restrictions     PatientRestriction[]
+  medical_reports  MedicalReport[]
+  history          DispensingHistory[]
+}
+
+model Restriction {
+  id                  Int                     @id @default(autoincrement())
+  nome                String
+  descricao           String?
+  patient_restrictions PatientRestriction[]
+  product_characteristics ProductCharacteristic[]
+}
+
+model PatientRestriction {
+  patient_id     Int
+  restriction_id Int
+  patient        Patient     @relation(fields: [patient_id], references: [id])
+  restriction    Restriction @relation(fields: [restriction_id], references: [id])
+
+  @@id([patient_id, restriction_id])
+}
+
+model Product {
+  id                   Int                     @id @default(autoincrement())
+  nome                 String
+  marca                String
+  descricao            String?
+  characteristics      ProductCharacteristic[]
+  batches              Batch[]
+  prescriptions        Prescription[]          @relation("MainProduct")
+  alternative_to       PrescriptionAlternative[]
+  dispensed_history    DispensingHistory[]
+}
+
+model ProductCharacteristic {
+  product_id     Int
+  restriction_id Int
+  product        Product     @relation(fields: [product_id], references: [id])
+  restriction    Restriction @relation(fields: [restriction_id], references: [id])
+
+  @@id([product_id, restriction_id])
+}
+
+model Batch {
+  id              Int                 @id @default(autoincrement())
+  product_id      Int
+  numero_lote     String
+  quantidade      Int
+  data_fabricacao DateTime
+  data_validade   DateTime
+  data_entrada    DateTime            @default(now())
+  product         Product             @relation(fields: [product_id], references: [id])
+  dispensed       DispensingHistory[]
+}
+
+model MedicalReport {
+  id              Int            @id @default(autoincrement())
+  patient_id      Int
+  data_emissao    DateTime
+  data_vencimento DateTime
+  status          String         @default("ATIVO")
+  patient         Patient        @relation(fields: [patient_id], references: [id])
+  prescriptions   Prescription[]
+}
+
+model Prescription {
+  id                 Int                       @id @default(autoincrement())
+  report_id          Int
+  product_main_id    Int
+  quantidade_mensal  Int
+  orientacoes        String?
+  report             MedicalReport             @relation(fields: [report_id], references: [id])
+  product_main       Product                   @relation("MainProduct", fields: [product_main_id], references: [id])
+  alternatives       PrescriptionAlternative[]
+  dispensed_history  DispensingHistory[]
+}
+
+model PrescriptionAlternative {
+  prescription_id        Int
+  product_alternative_id Int
+  ordem_prioridade       Int
+  prescription           Prescription @relation(fields: [prescription_id], references: [id])
+  product_alternative    Product      @relation(fields: [product_alternative_id], references: [id])
+
+  @@id([prescription_id, product_alternative_id])
+}
+
+model DispensingHistory {
+  id                     Int          @id @default(autoincrement())
+  patient_id             Int
+  prescription_id        Int
+  batch_id               Int
+  product_dispensed_id   Int
+  quantidade             Int
+  data_dispensacao       DateTime     @default(now())
+  substituicao_realizada Boolean      @default(false)
+  patient                Patient      @relation(fields: [patient_id], references: [id])
+  prescription           Prescription @relation(fields: [prescription_id], references: [id])
+  batch                  Batch        @relation(fields: [batch_id], references: [id])
+  product_dispensed      Product      @relation(fields: [product_dispensed_id], references: [id])
+}
