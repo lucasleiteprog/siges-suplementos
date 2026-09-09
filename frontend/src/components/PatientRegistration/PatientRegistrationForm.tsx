@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { Save, AlertCircle, Info, Calculator, ListPlus, Trash2 } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface Entity { id: number; nome: string; }
 
@@ -14,6 +16,9 @@ export function PatientRegistrationForm() {
   const { id } = useParams();
   const navigate = useNavigate();
   const isEditing = !!id;
+  const { user } = useAuth();
+  
+  const canEdit = user?.perm_pacientes_editar;
 
   const [formData, setFormData] = useState({
     nome: '', cpf: '', cartao_sus: '', data_nascimento: '',
@@ -228,6 +233,22 @@ export function PatientRegistrationForm() {
 
   const toggleArrayItem = (setter: React.Dispatch<React.SetStateAction<string[]>>, item: string) => {
     setter(prev => prev.includes(item) ? prev.filter(i => i !== item) : [...prev, item]);
+  };
+
+  const handleDelete = async () => {
+    if (!window.confirm('Tem certeza que deseja excluir este paciente? Esta ação não pode ser desfeita.')) return;
+    try {
+      const res = await fetch(`/api/patients/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        alert('Paciente excluído com sucesso.');
+        navigate('/pacientes');
+      } else {
+        const error = await res.json();
+        alert(error.error || 'Erro ao excluir paciente');
+      }
+    } catch (e) {
+      alert('Erro de conexão ao tentar excluir.');
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -544,6 +565,16 @@ export function PatientRegistrationForm() {
           </div>
 
           <div className="flex justify-end space-x-3 pt-6 border-t mt-8">
+            {isEditing && user?.perm_pacientes_excluir && (
+              <button 
+                type="button"
+                onClick={handleDelete}
+                className="px-6 py-2 bg-red-100 text-red-700 rounded-md hover:bg-red-200 focus:outline-none font-medium flex items-center mr-auto"
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Excluir Paciente
+              </button>
+            )}
             <button 
               type="button" 
               onClick={() => navigate('/pacientes')} 
@@ -551,9 +582,11 @@ export function PatientRegistrationForm() {
             >
               Cancelar
             </button>
-            <button type="submit" className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 font-medium">
-              {isEditing ? 'Salvar Alterações' : 'Salvar Paciente'}
-            </button>
+            {user?.perm_pacientes_editar && (
+              <button type="submit" className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 font-medium">
+                {isEditing ? 'Salvar Alterações' : 'Salvar Paciente'}
+              </button>
+            )}
           </div>
         </form>
       </div>

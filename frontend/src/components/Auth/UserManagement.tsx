@@ -1,18 +1,27 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { Trash2, UserPlus, Shield } from 'lucide-react';
+import { Trash2, UserPlus, Shield, CheckSquare, Edit } from 'lucide-react';
 
 export function UserManagement() {
   const { token, user: currentUser } = useAuth();
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [editingId, setEditingId] = useState<number | null>(null);
 
-  const [formData, setFormData] = useState({
+  const initialForm = {
     nome: '',
     username: '',
     password: '',
-    role: 'EMPLOYEE'
-  });
+    role: 'EMPLOYEE',
+    perm_pacientes_editar: true,
+    perm_pacientes_excluir: false,
+    perm_estoque_editar: true,
+    perm_estoque_excluir: false,
+    perm_listas_base: false,
+    perm_usuarios: false
+  };
+
+  const [formData, setFormData] = useState(initialForm);
 
   useEffect(() => {
     fetchUsers();
@@ -35,8 +44,11 @@ export function UserManagement() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await fetch('/api/users', {
-        method: 'POST',
+      const url = editingId ? `/api/users/${editingId}` : '/api/users';
+      const method = editingId ? 'PUT' : 'POST';
+
+      const res = await fetch(url, {
+        method,
         headers: { 
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}` 
@@ -44,11 +56,12 @@ export function UserManagement() {
         body: JSON.stringify(formData)
       });
       if (res.ok) {
-        setFormData({ nome: '', username: '', password: '', role: 'EMPLOYEE' });
+        setFormData(initialForm);
+        setEditingId(null);
         fetchUsers();
       } else {
         const error = await res.json();
-        alert(error.error || 'Erro ao criar usuário');
+        alert(error.error || 'Erro ao salvar usuário');
       }
     } catch (e) {
       alert('Erro de conexão');
@@ -74,79 +87,130 @@ export function UserManagement() {
     }
   };
 
+  const handleEdit = (user: any) => {
+    setEditingId(user.id);
+    setFormData({
+      ...user,
+      password: '' // Não carrega a senha ao editar
+    });
+  };
+
+  const handleCancel = () => {
+    setEditingId(null);
+    setFormData(initialForm);
+  }
+
+  const handleCheckbox = (field: string) => {
+    setFormData(prev => ({ ...prev, [field]: !(prev as any)[field] }));
+  };
+
   if (loading) return <div className="p-10 text-center">Carregando...</div>;
 
   return (
-    <div className="max-w-6xl mx-auto p-6 bg-white rounded-lg shadow-md mt-10 mb-20">
+    <div className="max-w-7xl mx-auto p-6 bg-white rounded-lg shadow-md mt-10 mb-20">
       <div className="flex items-center mb-8 border-b pb-4">
         <Shield className="w-6 h-6 mr-3 text-blue-600" />
         <div>
           <h2 className="text-2xl font-bold text-gray-800">Gerenciador de Acessos</h2>
-          <p className="text-gray-500 text-sm mt-1">Crie contas para os funcionários e defina suas permissões.</p>
+          <p className="text-gray-500 text-sm mt-1">Crie contas e defina exatamente o que cada funcionário pode ver ou fazer.</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
         {/* Formulário */}
-        <div className="md:col-span-1 bg-gray-50 p-6 rounded-lg border border-gray-200 h-fit">
+        <div className="lg:col-span-1 bg-gray-50 p-6 rounded-lg border border-gray-200 h-fit">
           <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
-            <UserPlus className="w-5 h-5 mr-2 text-blue-600" />
-            Novo Usuário
+            {editingId ? <Edit className="w-5 h-5 mr-2 text-blue-600" /> : <UserPlus className="w-5 h-5 mr-2 text-blue-600" />}
+            {editingId ? 'Editando Usuário' : 'Novo Usuário'}
           </h3>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Nome Completo</label>
-              <input type="text" required value={formData.nome} onChange={e => setFormData({...formData, nome: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" />
+              <input type="text" required value={formData.nome} onChange={e => setFormData({...formData, nome: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500" />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Nome de Usuário (Login)</label>
-              <input type="text" required value={formData.username} onChange={e => setFormData({...formData, username: e.target.value.toLowerCase()})} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" />
+              <input type="text" required disabled={!!editingId} value={formData.username} onChange={e => setFormData({...formData, username: e.target.value.toLowerCase()})} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 disabled:bg-gray-100" />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Senha Provisória</label>
-              <input type="text" required value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" />
+            {!editingId && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Senha Provisória</label>
+                <input type="text" required value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500" />
+              </div>
+            )}
+
+            <div className="pt-4 border-t border-gray-200 mt-4">
+              <h4 className="font-semibold text-gray-800 mb-2 flex items-center"><CheckSquare className="w-4 h-4 mr-2" /> Permissões do Sistema</h4>
+              
+              <div className="space-y-3">
+                <div className="bg-white p-3 border border-gray-200 rounded">
+                  <span className="text-xs font-bold text-gray-500 uppercase block mb-2">Pacientes</span>
+                  <label className="flex items-center text-sm mb-1"><input type="checkbox" checked={formData.perm_pacientes_editar} onChange={() => handleCheckbox('perm_pacientes_editar')} className="mr-2 rounded border-gray-300 text-blue-600" /> Pode Adicionar/Editar</label>
+                  <label className="flex items-center text-sm"><input type="checkbox" checked={formData.perm_pacientes_excluir} onChange={() => handleCheckbox('perm_pacientes_excluir')} className="mr-2 rounded border-gray-300 text-red-600" /> Pode Excluir Cadastro</label>
+                </div>
+
+                <div className="bg-white p-3 border border-gray-200 rounded">
+                  <span className="text-xs font-bold text-gray-500 uppercase block mb-2">Estoque e Lotes</span>
+                  <label className="flex items-center text-sm mb-1"><input type="checkbox" checked={formData.perm_estoque_editar} onChange={() => handleCheckbox('perm_estoque_editar')} className="mr-2 rounded border-gray-300 text-blue-600" /> Pode Dar Entrada/Editar Lote</label>
+                  <label className="flex items-center text-sm"><input type="checkbox" checked={formData.perm_estoque_excluir} onChange={() => handleCheckbox('perm_estoque_excluir')} className="mr-2 rounded border-gray-300 text-red-600" /> Pode Excluir Lote</label>
+                </div>
+
+                <div className="bg-white p-3 border border-gray-200 rounded">
+                  <span className="text-xs font-bold text-gray-500 uppercase block mb-2">Administração</span>
+                  <label className="flex items-center text-sm mb-1"><input type="checkbox" checked={formData.perm_listas_base} onChange={() => handleCheckbox('perm_listas_base')} className="mr-2 rounded border-gray-300 text-purple-600" /> Gerenciar Listas (Fórmulas, UBS, etc)</label>
+                  <label className="flex items-center text-sm"><input type="checkbox" checked={formData.perm_usuarios} onChange={() => handleCheckbox('perm_usuarios')} className="mr-2 rounded border-gray-300 text-purple-600" /> Gerenciar Usuários e Acessos</label>
+                </div>
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Nível de Acesso</label>
-              <select value={formData.role} onChange={e => setFormData({...formData, role: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
-                <option value="EMPLOYEE">Funcionário (Padrão)</option>
-                <option value="ADMIN">Administrador (Acesso Total)</option>
-              </select>
+
+            <div className="flex space-x-2 mt-6">
+              {editingId && <button type="button" onClick={handleCancel} className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-2 px-4 rounded-md transition-colors">Cancelar</button>}
+              <button type="submit" className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition-colors">
+                {editingId ? 'Salvar Alterações' : 'Criar Conta'}
+              </button>
             </div>
-            <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition-colors mt-4">
-              Criar Conta
-            </button>
           </form>
         </div>
 
         {/* Lista */}
-        <div className="md:col-span-2">
+        <div className="lg:col-span-2">
           <div className="overflow-x-auto border border-gray-200 rounded-lg">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nome</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Login</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Permissão</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nome / Login</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Acessos</th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Ações</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {users.map(u => (
-                  <tr key={u.id}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{u.nome} {u.id === currentUser?.id ? <span className="text-xs font-normal text-blue-500 ml-2">(Você)</span> : ''}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{u.username}</td>
+                  <tr key={u.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${u.role === 'ADMIN' ? 'bg-purple-100 text-purple-800' : 'bg-green-100 text-green-800'}`}>
-                        {u.role === 'ADMIN' ? 'Administrador' : 'Funcionário'}
-                      </span>
+                      <div className="text-sm font-medium text-gray-900">{u.nome} {u.id === currentUser?.id ? <span className="text-xs font-normal text-blue-500 ml-1">(Você)</span> : ''}</div>
+                      <div className="text-xs text-gray-500">@{u.username}</div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <td className="px-6 py-4">
+                      <div className="flex flex-wrap gap-1">
+                        {u.perm_pacientes_editar && <span className="px-2 py-1 text-[10px] font-semibold rounded bg-blue-100 text-blue-800">Edit Pacientes</span>}
+                        {u.perm_pacientes_excluir && <span className="px-2 py-1 text-[10px] font-semibold rounded bg-red-100 text-red-800">Del Pacientes</span>}
+                        {u.perm_estoque_editar && <span className="px-2 py-1 text-[10px] font-semibold rounded bg-blue-100 text-blue-800">Edit Estoque</span>}
+                        {u.perm_estoque_excluir && <span className="px-2 py-1 text-[10px] font-semibold rounded bg-red-100 text-red-800">Del Estoque</span>}
+                        {u.perm_listas_base && <span className="px-2 py-1 text-[10px] font-semibold rounded bg-purple-100 text-purple-800">Listas Base</span>}
+                        {u.perm_usuarios && <span className="px-2 py-1 text-[10px] font-semibold rounded bg-purple-100 text-purple-800">Usuários</span>}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-3">
                       {u.id !== currentUser?.id && (
-                        <button onClick={() => handleDelete(u.id)} className="text-red-600 hover:text-red-900" title="Excluir Acesso">
-                          <Trash2 className="w-5 h-5 ml-auto" />
-                        </button>
+                        <>
+                          <button onClick={() => handleEdit(u)} className="text-blue-600 hover:text-blue-900" title="Editar Permissões">
+                            <Edit className="w-5 h-5 inline" />
+                          </button>
+                          <button onClick={() => handleDelete(u.id)} className="text-red-600 hover:text-red-900" title="Excluir Usuário">
+                            <Trash2 className="w-5 h-5 inline" />
+                          </button>
+                        </>
                       )}
                     </td>
                   </tr>

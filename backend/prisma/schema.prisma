@@ -12,7 +12,15 @@ model User {
   nome          String
   username      String   @unique
   password_hash String
-  role          String   @default("EMPLOYEE") // ADMIN ou EMPLOYEE
+  role          String   @default("EMPLOYEE") // Mantido para compatibilidade, mas as flags vão mandar
+  
+  perm_pacientes_editar   Boolean @default(true)
+  perm_pacientes_excluir  Boolean @default(false)
+  perm_estoque_editar     Boolean @default(true)
+  perm_estoque_excluir    Boolean @default(false)
+  perm_listas_base        Boolean @default(false)
+  perm_usuarios           Boolean @default(false)
+
   created_at    DateTime @default(now())
 }
 

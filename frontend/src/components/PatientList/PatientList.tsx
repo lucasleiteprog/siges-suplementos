@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { Search, Plus, Filter, UserRound, Folder as FolderIcon, MapPin, Edit } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
 
 export function PatientList() {
+  const { user } = useAuth();
   const [patients, setPatients] = useState<any[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -34,13 +36,15 @@ export function PatientList() {
           <h2 className="text-2xl font-bold text-gray-800">Pacientes</h2>
           <p className="text-gray-500 text-sm mt-1">{patients.length} pacientes cadastrados</p>
         </div>
-        <Link 
-          to="/pacientes/novo" 
-          className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-medium transition-colors"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Novo Paciente
-        </Link>
+        {user?.perm_pacientes_editar && (
+          <Link 
+            to="/pacientes/novo" 
+            className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-medium transition-colors"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Novo Paciente
+          </Link>
+        )}
       </div>
 
       <div className="flex space-x-4 mb-6">

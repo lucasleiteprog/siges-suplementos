@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { PackageSearch, Plus, Calendar, AlertCircle, Pencil, Trash2 } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface Batch {
   id: number;
@@ -21,6 +22,7 @@ interface Formula {
 }
 
 export function StockEntry() {
+  const { user } = useAuth();
   const [batches, setBatches] = useState<Batch[]>([]);
   const [formulas, setFormulas] = useState<Formula[]>([]);
   const [loading, setLoading] = useState(true);
@@ -125,13 +127,15 @@ export function StockEntry() {
           </h2>
           <p className="text-gray-500 text-sm mt-1">Gerencie a entrada de novas latas e controle as datas de validade</p>
         </div>
-        <button 
-          onClick={() => setIsModalOpen(true)}
-          className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-medium transition-colors"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Registrar Entrada
-        </button>
+        {user?.perm_estoque_editar && (
+          <button 
+            onClick={() => setIsModalOpen(true)}
+            className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-medium transition-colors"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Nova Entrada
+          </button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -223,20 +227,24 @@ export function StockEntry() {
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <button 
-                          onClick={() => handleEdit(batch)}
-                          className="text-gray-400 hover:text-blue-600 mr-3 transition-colors"
-                          title="Editar Lote"
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </button>
-                        <button 
-                          onClick={() => handleDelete(batch.id)}
-                          className="text-gray-400 hover:text-red-600 transition-colors"
-                          title="Excluir Lote"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        {user?.perm_estoque_editar && (
+                          <button 
+                            onClick={() => handleEdit(batch)}
+                            className="text-gray-400 hover:text-blue-600 mr-3 transition-colors"
+                            title="Editar Lote"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                        )}
+                        {user?.perm_estoque_excluir && (
+                          <button 
+                            onClick={() => handleDelete(batch.id)}
+                            className="text-gray-400 hover:text-red-600 transition-colors"
+                            title="Excluir Lote"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
                       </td>
                     </tr>
                   );

@@ -4,6 +4,12 @@ type User = {
   id: number;
   nome: string;
   role: 'ADMIN' | 'EMPLOYEE';
+  perm_pacientes_editar: boolean;
+  perm_pacientes_excluir: boolean;
+  perm_estoque_editar: boolean;
+  perm_estoque_excluir: boolean;
+  perm_listas_base: boolean;
+  perm_usuarios: boolean;
 };
 
 interface AuthContextType {

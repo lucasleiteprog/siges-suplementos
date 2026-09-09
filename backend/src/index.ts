@@ -317,6 +317,17 @@ app.put('/api/patients/:id', async (req, res) => {
   }
 });
 
+app.delete('/api/patients/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    await prisma.patient.delete({ where: { id } });
+    res.status(204).send();
+  } catch (e: any) {
+    if (e.code === 'P2003') return res.status(400).json({ error: 'Não é possível excluir o paciente pois há registros de dispensação (histórico) vinculados a ele.' });
+    res.status(500).json({ error: 'Erro ao excluir paciente' });
+  }
+});
+
 app.post('/api/patients', async (req, res) => {
   try {
     const data = req.body;
@@ -542,7 +553,13 @@ async function seedAdmin() {
         nome: 'Administrador Padrão',
         username: 'admin',
         password_hash: passwordHash,
-        role: 'ADMIN'
+        role: 'ADMIN',
+        perm_pacientes_editar: true,
+        perm_pacientes_excluir: true,
+        perm_estoque_editar: true,
+        perm_estoque_excluir: true,
+        perm_listas_base: true,
+        perm_usuarios: true
       }
     });
     console.log('Usuário admin criado (Login: admin / Senha: admin123)');
@@ -585,13 +602,15 @@ app.post('/api/auth/login', async (req, res) => {
     const validPassword = await bcrypt.compare(password, user.password_hash);
     if (!validPassword) return res.status(401).json({ error: 'Usuário ou senha inválidos' });
 
+    const { password_hash, ...userWithoutPassword } = user;
+
     const token = jwt.sign(
-      { id: user.id, username: user.username, role: user.role, nome: user.nome }, 
+      userWithoutPassword, 
       JWT_SECRET, 
       { expiresIn: '24h' }
     );
 
-    res.json({ token, user: { id: user.id, nome: user.nome, role: user.role } });
+    res.json({ token, user: userWithoutPassword });
   } catch (error) {
     res.status(500).json({ error: 'Erro no servidor' });
   }
@@ -605,23 +624,36 @@ app.get('/api/auth/me', authenticateToken, (req: any, res: any) => {
 // ROTAS DE GERENCIAMENTO DE USUÁRIOS (SÓ ADMIN)
 // ==========================================
 app.get('/api/users', authenticateToken, requireAdmin, async (req, res) => {
-  const users = await prisma.user.findMany({ select: { id: true, nome: true, username: true, role: true, created_at: true } });
+  const users = await prisma.user.findMany({ select: { id: true, nome: true, username: true, role: true, created_at: true, perm_pacientes_editar: true, perm_pacientes_excluir: true, perm_estoque_editar: true, perm_estoque_excluir: true, perm_listas_base: true, perm_usuarios: true } });
   res.json(users);
 });
 
 app.post('/api/users', authenticateToken, requireAdmin, async (req, res) => {
-  const { nome, username, password, role } = req.body;
+  const { nome, username, password, role, perm_pacientes_editar, perm_pacientes_excluir, perm_estoque_editar, perm_estoque_excluir, perm_listas_base, perm_usuarios } = req.body;
   try {
     const exists = await prisma.user.findUnique({ where: { username } });
     if (exists) return res.status(400).json({ error: 'Username já existe' });
 
     const password_hash = await bcrypt.hash(password, 10);
     const user = await prisma.user.create({
-      data: { nome, username, password_hash, role }
+      data: { nome, username, password_hash, role, perm_pacientes_editar, perm_pacientes_excluir, perm_estoque_editar, perm_estoque_excluir, perm_listas_base, perm_usuarios }
     });
     res.status(201).json({ id: user.id, nome: user.nome, role: user.role });
   } catch (error) {
     res.status(500).json({ error: 'Erro ao criar usuário' });
+  }
+});
+
+app.put('/api/users/:id', authenticateToken, requireAdmin, async (req, res) => {
+  const { role, perm_pacientes_editar, perm_pacientes_excluir, perm_estoque_editar, perm_estoque_excluir, perm_listas_base, perm_usuarios } = req.body;
+  try {
+    const user = await prisma.user.update({
+      where: { id: parseInt(req.params.id) },
+      data: { role, perm_pacientes_editar, perm_pacientes_excluir, perm_estoque_editar, perm_estoque_excluir, perm_listas_base, perm_usuarios }
+    });
+    res.json(user);
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao atualizar usuário' });
   }
 });
 

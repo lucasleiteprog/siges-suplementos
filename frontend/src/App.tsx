@@ -68,21 +68,25 @@ function App() {
             Lotes e Entrada
           </Link>
           
-          {isAdmin && (
+          {(user.perm_listas_base || user.perm_usuarios) && (
             <>
               <div className="pt-4 pb-2">
                 <p className="px-4 text-xs font-semibold text-blue-400 uppercase tracking-wider">
                   Administração
                 </p>
               </div>
-              <Link to="/admin/listas" className={getNavClass('/admin/listas')}>
-                <Settings className="w-5 h-5 mr-3 opacity-90" />
-                Listas Base
-              </Link>
-              <Link to="/admin/usuarios" className={getNavClass('/admin/usuarios')}>
-                <Shield className="w-5 h-5 mr-3 opacity-90" />
-                Usuários e Acessos
-              </Link>
+              {user.perm_listas_base && (
+                <Link to="/admin/listas" className={getNavClass('/admin/listas')}>
+                  <Settings className="w-5 h-5 mr-3 opacity-90" />
+                  Listas Base
+                </Link>
+              )}
+              {user.perm_usuarios && (
+                <Link to="/admin/usuarios" className={getNavClass('/admin/usuarios')}>
+                  <Shield className="w-5 h-5 mr-3 opacity-90" />
+                  Usuários e Acessos
+                </Link>
+              )}
             </>
           )}
         </nav>
@@ -91,7 +95,7 @@ function App() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-bold text-white">{user.nome}</p>
-              <p className="text-xs text-blue-300">{isAdmin ? 'Administrador' : 'Funcionário'}</p>
+              <p className="text-xs text-blue-300">{user.role === 'ADMIN' ? 'Administrador' : 'Funcionário'}</p>
             </div>
             <button onClick={logout} className="p-2 text-blue-300 hover:text-red-400 transition-colors" title="Sair do sistema">
               <LogOut className="w-5 h-5" />
@@ -109,11 +113,11 @@ function App() {
           <Route path="/pacientes/editar/:id" element={<PatientRegistrationForm />} />
           <Route path="/entregas" element={<Dispensing />} />
           <Route path="/estoque" element={<StockEntry />} />
-          {isAdmin && (
-            <>
-              <Route path="/admin/listas" element={<AdminLists />} />
-              <Route path="/admin/usuarios" element={<UserManagement />} />
-            </>
+          {user.perm_listas_base && (
+             <Route path="/admin/listas" element={<AdminLists />} />
+          )}
+          {user.perm_usuarios && (
+            <Route path="/admin/usuarios" element={<UserManagement />} />
           )}
           {/* Fallback para rotas não autorizadas */}
           <Route path="*" element={<div className="p-10 text-center text-gray-500 font-bold">Página não encontrada ou acesso negado.</div>} />
