@@ -1,16 +1,17 @@
 import { Routes, Route, Link, useLocation } from 'react-router-dom';
-import { Users, PackageSearch, Settings, Truck } from 'lucide-react';
+import { Users, PackageSearch, Settings, Truck, LayoutDashboard } from 'lucide-react';
 import { PatientRegistrationForm } from './components/PatientRegistration/PatientRegistrationForm';
 import { PatientList } from './components/PatientList/PatientList';
 import { AdminLists } from './components/AdminLists/AdminLists';
 import { StockEntry } from './components/StockEntry/StockEntry';
 import { Dispensing } from './components/Dispensing/Dispensing';
+import { Dashboard } from './components/Dashboard/Dashboard';
 
 function App() {
   const location = useLocation();
 
   const getNavClass = (path: string) => {
-    return location.pathname === path || (path === '/pacientes/novo' && location.pathname === '/')
+    return location.pathname === path || (path === '/pacientes/novo' && location.pathname.includes('/pacientes/'))
       ? "bg-blue-800 text-white flex items-center px-4 py-3 text-sm font-medium rounded-md"
       : "text-blue-100 hover:bg-blue-800 hover:text-white flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors";
   };
@@ -25,11 +26,20 @@ function App() {
         </div>
         
         <nav className="flex-1 px-3 py-6 space-y-2 overflow-y-auto">
+          <Link to="/" className={getNavClass('/')}>
+            <LayoutDashboard className="w-5 h-5 mr-3 opacity-90" />
+            Dashboard
+          </Link>
+          <div className="pt-4 pb-2">
+            <p className="px-4 text-xs font-semibold text-blue-400 uppercase tracking-wider">
+              Pacientes
+            </p>
+          </div>
           <Link to="/pacientes" className={getNavClass('/pacientes')}>
             <Users className="w-5 h-5 mr-3 opacity-90" />
-            Pacientes
+            Consultar e Cadastrar
           </Link>
-          <div className="pt-6 pb-2">
+          <div className="pt-4 pb-2">
             <p className="px-4 text-xs font-semibold text-blue-400 uppercase tracking-wider">
               Dispensação
             </p>
@@ -38,7 +48,7 @@ function App() {
             <Truck className="w-5 h-5 mr-3 opacity-90" />
             Nova Entrega
           </Link>
-          <div className="pt-6 pb-2">
+          <div className="pt-4 pb-2">
             <p className="px-4 text-xs font-semibold text-blue-400 uppercase tracking-wider">
               Estoque
             </p>
@@ -47,7 +57,7 @@ function App() {
             <PackageSearch className="w-5 h-5 mr-3 opacity-90" />
             Lotes e Entrada
           </Link>
-          <div className="pt-6 pb-2">
+          <div className="pt-4 pb-2">
             <p className="px-4 text-xs font-semibold text-blue-400 uppercase tracking-wider">
               Sistema
             </p>
@@ -62,7 +72,7 @@ function App() {
       {/* Main Content Area */}
       <div className="flex-1 overflow-y-auto bg-gray-50">
         <Routes>
-          <Route path="/" element={<PatientList />} />
+          <Route path="/" element={<Dashboard />} />
           <Route path="/pacientes" element={<PatientList />} />
           <Route path="/pacientes/novo" element={<PatientRegistrationForm />} />
           <Route path="/pacientes/editar/:id" element={<PatientRegistrationForm />} />

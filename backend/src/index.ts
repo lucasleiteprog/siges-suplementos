@@ -443,6 +443,86 @@ app.post('/api/dispense', async (req, res) => {
   }
 });
 
+// ==========================================
+// DASHBOARD (ESTATÍSTICAS)
+// ==========================================
+app.get('/api/dashboard', async (req, res) => {
+  try {
+    const today = new Date();
+    const sixtyDaysFromNow = new Date();
+    sixtyDaysFromNow.setDate(today.getDate() + 60);
+
+    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+
+    // 1. Total de pacientes cadastrados
+    const totalPatients = await prisma.patient.count();
+
+    // 2. Fórmulas cadastradas
+    const totalFormulas = await prisma.formula.count();
+
+    // 3. Alertas de Estoque: Lotes vencendo nos próximos 60 dias
+    const expiringBatches = await prisma.batch.findMany({
+      where: {
+        quantidade_atual: { gt: 0 },
+        data_validade: {
+          lte: sixtyDaysFromNow
+        }
+      },
+      include: {
+        formula: true
+      },
+      orderBy: { data_validade: 'asc' },
+      take: 10
+    });
+
+    // 4. Lotes esgotados ou zerados recentemente (só pra avisar)
+    const emptyBatches = await prisma.batch.findMany({
+      where: { quantidade_atual: 0 },
+      include: { formula: true },
+      take: 5
+    });
+
+    // 5. Histórico recente de dispensações no mês atual
+    const recentDispensing = await prisma.dispensingHistory.findMany({
+      where: {
+        data_dispensacao: {
+          gte: startOfMonth
+        }
+      },
+      include: {
+        patient: { select: { nome: true } },
+        batch: { include: { formula: true } }
+      },
+      orderBy: { data_dispensacao: 'desc' },
+      take: 5
+    });
+
+    // Calcular total de itens dispensados neste mês
+    const totalDispensedMonth = await prisma.dispensingHistory.aggregate({
+      where: {
+        data_dispensacao: {
+          gte: startOfMonth
+        }
+      },
+      _sum: {
+        quantidade: true
+      }
+    });
+
+    res.status(200).json({
+      totalPatients,
+      totalFormulas,
+      expiringBatches,
+      emptyBatches,
+      recentDispensing,
+      totalDispensedMonth: totalDispensedMonth._sum.quantidade || 0
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Erro ao carregar dados do dashboard' });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
