@@ -206,7 +206,10 @@ app.put('/api/batches/:id', async (req, res) => {
       include: { formula: true }
     });
     res.json(batch);
-  } catch (e) { res.status(500).json({ error: 'Erro ao atualizar lote' }); }
+  } catch (e) { 
+    console.error("ERRO AO ATUALIZAR LOTE:", e);
+    res.status(500).json({ error: 'Erro ao atualizar lote' }); 
+  }
 });
 
 app.delete('/api/batches/:id', async (req, res) => {

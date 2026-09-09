@@ -33,6 +33,7 @@ export function StockEntry() {
     numero_lote: '',
     data_validade: '',
     quantidade_inicial: '',
+    quantidade_atual: '',
     observacoes: ''
   });
 
@@ -74,7 +75,7 @@ export function StockEntry() {
       if (res.ok) {
         setIsModalOpen(false);
         setEditingId(null);
-        setFormData({ formulaId: '', numero_lote: '', data_validade: '', quantidade_inicial: '', observacoes: '' });
+        setFormData({ formulaId: '', numero_lote: '', data_validade: '', quantidade_inicial: '', quantidade_atual: '', observacoes: '' });
         fetchBatches();
       } else {
         const error = await res.json();
@@ -103,6 +104,7 @@ export function StockEntry() {
       numero_lote: batch.numero_lote,
       data_validade: new Date(batch.data_validade).toISOString().split('T')[0],
       quantidade_inicial: batch.quantidade_inicial.toString(),
+      quantidade_atual: batch.quantidade_atual.toString(),
       observacoes: batch.observacoes || ''
     });
     setIsModalOpen(true);
@@ -305,6 +307,20 @@ export function StockEntry() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
+
+              {editingId && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Quantidade Atual no Estoque</label>
+                  <input 
+                    type="number" required min="0"
+                    placeholder="Ex: 40"
+                    value={formData.quantidade_atual}
+                    onChange={e => setFormData({...formData, quantidade_atual: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Só edite se precisar corrigir o saldo sem registrar dispensação.</p>
+                </div>
+              )}
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Observações (Opcional)</label>
