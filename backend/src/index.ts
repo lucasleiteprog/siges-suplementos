@@ -1,6 +1,8 @@
 import express from 'express';
 import cors from 'cors';
 import { PrismaClient } from '@prisma/client';
+import jwt from 'jsonwebtoken';
+import bcrypt from 'bcryptjs';
 
 const app = express();
 const prisma = new PrismaClient();
@@ -520,6 +522,112 @@ app.get('/api/dashboard', async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Erro ao carregar dados do dashboard' });
+  }
+});
+
+const JWT_SECRET = 'siges-secret-key-123'; // Em produção, usar process.env.JWT_SECRET
+
+// ==========================================
+// SEEDING INICIAL (CRIAR ADMIN)
+// ==========================================
+async function seedAdmin() {
+  const adminExists = await prisma.user.findFirst({ where: { role: 'ADMIN' } });
+  if (!adminExists) {
+    const passwordHash = await bcrypt.hash('admin123', 10);
+    await prisma.user.create({
+      data: {
+        nome: 'Administrador Padrão',
+        username: 'admin',
+        password_hash: passwordHash,
+        role: 'ADMIN'
+      }
+    });
+    console.log('Usuário admin criado (Login: admin / Senha: admin123)');
+  }
+}
+seedAdmin();
+
+// ==========================================
+// MIDDLEWARE DE AUTENTICAÇÃO
+// ==========================================
+const authenticateToken = (req: any, res: any, next: any) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+  
+  if (!token) return res.sendStatus(401);
+
+  jwt.verify(token, JWT_SECRET, (err: any, user: any) => {
+    if (err) return res.sendStatus(403);
+    req.user = user;
+    next();
+  });
+};
+
+const requireAdmin = (req: any, res: any, next: any) => {
+  if (req.user?.role !== 'ADMIN') {
+    return res.status(403).json({ error: 'Acesso negado. Apenas administradores.' });
+  }
+  next();
+};
+
+// ==========================================
+// ROTAS DE AUTENTICAÇÃO
+// ==========================================
+app.post('/api/auth/login', async (req, res) => {
+  const { username, password } = req.body;
+  try {
+    const user = await prisma.user.findUnique({ where: { username } });
+    if (!user) return res.status(401).json({ error: 'Usuário ou senha inválidos' });
+
+    const validPassword = await bcrypt.compare(password, user.password_hash);
+    if (!validPassword) return res.status(401).json({ error: 'Usuário ou senha inválidos' });
+
+    const token = jwt.sign(
+      { id: user.id, username: user.username, role: user.role, nome: user.nome }, 
+      JWT_SECRET, 
+      { expiresIn: '24h' }
+    );
+
+    res.json({ token, user: { id: user.id, nome: user.nome, role: user.role } });
+  } catch (error) {
+    res.status(500).json({ error: 'Erro no servidor' });
+  }
+});
+
+app.get('/api/auth/me', authenticateToken, (req: any, res: any) => {
+  res.json(req.user);
+});
+
+// ==========================================
+// ROTAS DE GERENCIAMENTO DE USUÁRIOS (SÓ ADMIN)
+// ==========================================
+app.get('/api/users', authenticateToken, requireAdmin, async (req, res) => {
+  const users = await prisma.user.findMany({ select: { id: true, nome: true, username: true, role: true, created_at: true } });
+  res.json(users);
+});
+
+app.post('/api/users', authenticateToken, requireAdmin, async (req, res) => {
+  const { nome, username, password, role } = req.body;
+  try {
+    const exists = await prisma.user.findUnique({ where: { username } });
+    if (exists) return res.status(400).json({ error: 'Username já existe' });
+
+    const password_hash = await bcrypt.hash(password, 10);
+    const user = await prisma.user.create({
+      data: { nome, username, password_hash, role }
+    });
+    res.status(201).json({ id: user.id, nome: user.nome, role: user.role });
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao criar usuário' });
+  }
+});
+
+app.delete('/api/users/:id', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    await prisma.user.delete({ where: { id: parseInt(req.params.id) } });
+    res.sendStatus(204);
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao deletar usuário' });
   }
 });
 
