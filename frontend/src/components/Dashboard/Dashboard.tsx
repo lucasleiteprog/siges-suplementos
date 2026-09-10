@@ -37,8 +37,13 @@ export function Dashboard() {
             <Users className="w-8 h-8 text-blue-600" />
           </div>
           <div>
-            <p className="text-sm font-medium text-gray-500 uppercase">Pacientes Cadastrados</p>
-            <p className="text-3xl font-bold text-gray-800">{data.totalPatients}</p>
+            <p className="text-sm font-medium text-gray-500 uppercase">Pacientes Ativos</p>
+            <p className="text-3xl font-bold text-gray-800">{data.pacientes_ativos || data.totalPatients}</p>
+            {(data.pacientes_pendentes > 0 || data.pacientes_falecidos > 0) && (
+              <p className="text-xs text-gray-400 mt-1">
+                {data.pacientes_pendentes} pendente(s) | {data.pacientes_falecidos} falecido(s)
+              </p>
+            )}
           </div>
         </div>
 

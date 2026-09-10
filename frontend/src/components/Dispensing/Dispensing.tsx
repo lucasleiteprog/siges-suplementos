@@ -5,6 +5,7 @@ export function Dispensing() {
   const [patients, setPatients] = useState<any[]>([]);
   const [batches, setBatches] = useState<any[]>([]);
   const [history, setHistory] = useState<any[]>([]);
+  const [settings, setSettings] = useState({ dias_validade_relatorio: 90, dias_aviso_renovacao: 30 });
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPatient, setSelectedPatient] = useState<any | null>(null);
   const [selectedFormulaId, setSelectedFormulaId] = useState<string>('');
@@ -12,7 +13,9 @@ export function Dispensing() {
   const [quemEntregou, setQuemEntregou] = useState<string>('');
   const [quemRecebeu, setQuemRecebeu] = useState<string>('');
   const [observacoes, setObservacoes] = useState<string>('');
+  
   const [isUrgencyChecked, setIsUrgencyChecked] = useState<boolean>(false);
+  const [avisoRenovacaoCiente, setAvisoRenovacaoCiente] = useState<boolean>(false);
   
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -21,10 +24,18 @@ export function Dispensing() {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
+    fetchSettings();
     fetchHistory();
     fetchPatients();
     fetchBatches();
   }, []);
+
+  const fetchSettings = async () => {
+    try {
+      const res = await fetch('/api/settings');
+      if (res.ok) setSettings(await res.json());
+    } catch (e) { console.error(e); }
+  };
 
   const fetchHistory = async () => {
     try {
@@ -55,20 +66,42 @@ export function Dispensing() {
   };
 
   const filteredPatients = patients.filter(p => 
-    p.nome.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    p.cpf.includes(searchQuery)
+    p.status === 'ATIVO' && // Somente pacientes ativos podem receber dispensação
+    (p.nome.toLowerCase().includes(searchQuery.toLowerCase()) || p.cpf.includes(searchQuery))
   );
 
   let daysSinceDelivery = -1;
   let isEarlyDelivery = false;
   
-  if (selectedPatient?.data_entrega) {
-    const msDiff = new Date().getTime() - new Date(selectedPatient.data_entrega).getTime();
-    daysSinceDelivery = Math.floor(msDiff / (1000 * 60 * 60 * 24));
-    if (daysSinceDelivery < 30) {
-      isEarlyDelivery = true;
+  let daysSinceReport = -1;
+  let isReportExpired = false;
+  let isReportWarning = false;
+
+  if (selectedPatient) {
+    if (selectedPatient.data_entrega) {
+      const msDiff = new Date().getTime() - new Date(selectedPatient.data_entrega).getTime();
+      daysSinceDelivery = Math.floor(msDiff / (1000 * 60 * 60 * 24));
+      if (daysSinceDelivery < 30) {
+        isEarlyDelivery = true;
+      }
+    }
+    
+    if (selectedPatient.data_ultimo_relatorio) {
+      const msDiff = new Date().getTime() - new Date(selectedPatient.data_ultimo_relatorio).getTime();
+      daysSinceReport = Math.floor(msDiff / (1000 * 60 * 60 * 24));
+      
+      if (daysSinceReport >= settings.dias_validade_relatorio) {
+        isReportExpired = true;
+      } else if (daysSinceReport >= (settings.dias_validade_relatorio - settings.dias_aviso_renovacao)) {
+        isReportWarning = true;
+      }
+    } else {
+      isReportExpired = true; // Se não tem data, está expirado/pendente
     }
   }
+
+  const isBlocked = (isEarlyDelivery && !isUrgencyChecked) || (isReportExpired && !isUrgencyChecked);
+  const requiresUrgency = isEarlyDelivery || isReportExpired;
 
   const getFormulaStock = (formulaId: number) => {
     return batches
@@ -91,7 +124,8 @@ export function Dispensing() {
           quantidade_solicitada: parseInt(quantity),
           quem_entregou: quemEntregou,
           quem_recebeu: quemRecebeu,
-          observacoes: observacoes
+          observacoes: observacoes,
+          aviso_renovacao_ciente: avisoRenovacaoCiente
         })
       });
 
@@ -102,7 +136,6 @@ export function Dispensing() {
         fetchPatients();
         fetchHistory();
         
-        // Reset form for next dispense
         setTimeout(() => {
           setSelectedPatient(null);
           setSelectedFormulaId('');
@@ -182,6 +215,9 @@ export function Dispensing() {
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-500">
                     {h.quem_recebeu || '-'}
+                    {h.aviso_renovacao_ciente && (
+                      <div className="text-xs text-orange-600 mt-1" title="Avisado sobre renovação do relatório">🔔 Avisado Renovação</div>
+                    )}
                     {h.observacoes && (
                       <div className="text-xs text-red-500 mt-1" title={h.observacoes}>Ver obs.</div>
                     )}
@@ -216,7 +252,7 @@ export function Dispensing() {
                       </div>
                       <input
                         type="text"
-                        placeholder="Buscar paciente por nome ou CPF..."
+                        placeholder="Buscar paciente (Apenas ATIVOS)..."
                         className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
@@ -239,6 +275,7 @@ export function Dispensing() {
                                 setSelectedFormulaId('');
                                 setSuccessMessage('');
                                 setIsUrgencyChecked(false);
+                                setAvisoRenovacaoCiente(false);
                               }}
                               className={`p-4 cursor-pointer hover:bg-blue-50 transition-colors ${selectedPatient?.id === patient.id ? 'bg-blue-100 border-l-4 border-blue-600' : ''}`}
                             >
@@ -281,7 +318,7 @@ export function Dispensing() {
                           <div className="mb-6 bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
                             <h3 className="font-bold text-gray-800 text-lg">{selectedPatient.nome}</h3>
                             <div className="mt-2 text-sm text-gray-600 grid grid-cols-2 gap-2">
-                              <div><span className="font-medium">CPF:</span> {selectedPatient.cpf || '-'}</div>
+                              <div><span className="font-medium">Relatório Atualizado:</span> {selectedPatient.data_ultimo_relatorio ? new Date(selectedPatient.data_ultimo_relatorio).toLocaleDateString() : 'Não informado'}</div>
                               <div><span className="font-medium">Idade:</span> {selectedPatient.data_nascimento ? Math.floor((new Date().getTime() - new Date(selectedPatient.data_nascimento).getTime()) / 31557600000) + ' anos' : '-'}</div>
                               <div className="col-span-2">
                                 <span className="font-medium">Última Entrega:</span> {selectedPatient.data_entrega ? new Date(selectedPatient.data_entrega).toLocaleDateString() : 'Nunca recebeu'}
@@ -289,23 +326,57 @@ export function Dispensing() {
                             </div>
                           </div>
 
+                          {isReportExpired && (
+                            <div className="mb-6 bg-red-50 border border-red-200 p-4 rounded-md flex">
+                              <AlertTriangle className="w-5 h-5 text-red-600 mr-2 flex-shrink-0" />
+                              <div>
+                                <span className="font-bold text-red-800 block">Relatório Vencido ({daysSinceReport > 0 ? `${daysSinceReport} dias atrás` : 'Sem data'})</span>
+                                <span className="text-sm text-red-700 block mb-1">O relatório ultrapassou a validade configurada ({settings.dias_validade_relatorio} dias). A entrega não é permitida sem atualização.</span>
+                              </div>
+                            </div>
+                          )}
+
+                          {isReportWarning && !isReportExpired && (
+                            <div className="mb-6 bg-orange-50 border border-orange-200 p-4 rounded-md flex">
+                              <AlertTriangle className="w-5 h-5 text-orange-600 mr-2 flex-shrink-0" />
+                              <div>
+                                <span className="font-bold text-orange-800 block">Aviso de Renovação do Relatório</span>
+                                <span className="text-sm text-orange-700 block mb-2">O relatório vencerá em breve. Validade máxima configurada: {settings.dias_validade_relatorio} dias. Dias desde o último: {daysSinceReport} dias.</span>
+                                
+                                <label className="flex items-center text-sm font-medium text-orange-900 cursor-pointer p-2 bg-orange-100 rounded border border-orange-300">
+                                  <input 
+                                    type="checkbox" 
+                                    checked={avisoRenovacaoCiente}
+                                    onChange={(e) => setAvisoRenovacaoCiente(e.target.checked)}
+                                    className="w-4 h-4 text-orange-600 border-orange-300 rounded focus:ring-orange-500 mr-2"
+                                  />
+                                  Confirmo que o paciente foi avisado da necessidade de renovação
+                                </label>
+                              </div>
+                            </div>
+                          )}
+
                           {isEarlyDelivery && (
                             <div className="mb-6 bg-red-50 border border-red-200 p-4 rounded-md flex">
                               <AlertTriangle className="w-5 h-5 text-red-600 mr-2 flex-shrink-0" />
                               <div>
-                                <span className="font-bold text-red-800 block">Dispensação Bloqueada ({daysSinceDelivery} dias)</span>
-                                <span className="text-sm text-red-700 block mb-3">A última entrega foi feita há apenas {daysSinceDelivery} dias ({new Date(selectedPatient.data_entrega).toLocaleDateString()}). O paciente ainda está dentro do período de 30 dias.</span>
-                                
-                                <label className="flex items-center text-sm font-medium text-red-900 cursor-pointer">
+                                <span className="font-bold text-red-800 block">Entrega Bloqueada ({daysSinceDelivery} dias)</span>
+                                <span className="text-sm text-red-700 block mb-1">A última entrega foi feita há apenas {daysSinceDelivery} dias. O paciente ainda está dentro do período de 30 dias.</span>
+                              </div>
+                            </div>
+                          )}
+                          
+                          {requiresUrgency && (
+                            <div className="mb-6 bg-yellow-50 border border-yellow-200 p-4 rounded-md">
+                                <label className="flex items-center text-sm font-medium text-yellow-900 cursor-pointer">
                                   <input 
                                     type="checkbox" 
                                     checked={isUrgencyChecked}
                                     onChange={(e) => setIsUrgencyChecked(e.target.checked)}
-                                    className="w-4 h-4 text-red-600 border-red-300 rounded focus:ring-red-500 mr-2"
+                                    className="w-4 h-4 text-yellow-600 border-yellow-300 rounded focus:ring-yellow-500 mr-2"
                                   />
-                                  Liberar dispensação de urgência (Exigirá justificativa)
+                                  Liberar dispensação excepcionalmente (Urgência)
                                 </label>
-                              </div>
                             </div>
                           )}
 
@@ -384,35 +455,30 @@ export function Dispensing() {
                                   onChange={(e) => setQuantity(e.target.value)}
                                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 />
-                                {selectedFormulaId && (
-                                  <p className="text-xs text-gray-500 mt-1">
-                                    O sistema dará baixa nos lotes mais antigos (FEFO).
-                                  </p>
-                                )}
                               </div>
 
                               <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Observações {(isEarlyDelivery && isUrgencyChecked) ? <span className="text-red-500 font-bold">(Motivo obrigatório)</span> : ''}</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Observações {(requiresUrgency && isUrgencyChecked) ? <span className="text-red-500 font-bold">(Motivo obrigatório)</span> : ''}</label>
                                 <textarea 
                                   rows={2}
-                                  required={isEarlyDelivery && isUrgencyChecked}
-                                  placeholder={(isEarlyDelivery && isUrgencyChecked) ? "Descreva o motivo da urgência..." : "Anotações opcionais..."}
+                                  required={requiresUrgency && isUrgencyChecked}
+                                  placeholder={(requiresUrgency && isUrgencyChecked) ? "Descreva o motivo da urgência/liberação..." : "Anotações opcionais..."}
                                   value={observacoes}
                                   onChange={(e) => setObservacoes(e.target.value)}
-                                  className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${(isEarlyDelivery && isUrgencyChecked && !observacoes.trim()) ? 'border-red-400 bg-red-50' : 'border-gray-300'}`}
+                                  className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${(requiresUrgency && isUrgencyChecked && !observacoes.trim()) ? 'border-red-400 bg-red-50' : 'border-gray-300'}`}
                                 />
                               </div>
 
                               <button 
                                 type="submit" 
-                                disabled={(isEarlyDelivery && !isUrgencyChecked) || submitting || !selectedFormulaId || !quantity || !quemEntregou || !quemRecebeu || (isEarlyDelivery && isUrgencyChecked && !observacoes.trim())}
+                                disabled={isBlocked || (isReportWarning && !avisoRenovacaoCiente) || submitting || !selectedFormulaId || !quantity || !quemEntregou || !quemRecebeu || (requiresUrgency && isUrgencyChecked && !observacoes.trim())}
                                 className={`w-full py-3 px-4 font-medium rounded-md shadow-sm transition-colors flex justify-center items-center ${
-                                  (isEarlyDelivery && !isUrgencyChecked) 
+                                  isBlocked || (isReportWarning && !avisoRenovacaoCiente)
                                     ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
                                     : 'bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white'
                                 }`}
                               >
-                                {(isEarlyDelivery && !isUrgencyChecked) ? 'Bloqueado (Prazo)' : submitting ? 'Processando...' : 'Confirmar Dispensação'}
+                                {isBlocked ? 'Bloqueado (Prazo/Relatório)' : (isReportWarning && !avisoRenovacaoCiente) ? 'Confirme o Aviso Acima' : submitting ? 'Processando...' : 'Confirmar Dispensação'}
                               </button>
                             </form>
                           )}

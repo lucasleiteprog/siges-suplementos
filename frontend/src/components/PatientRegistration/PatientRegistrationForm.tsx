@@ -23,7 +23,7 @@ export function PatientRegistrationForm() {
   const [formData, setFormData] = useState({
     nome: '', cpf: '', cartao_sus: '', data_nascimento: '',
     endereco: '', bairro: '', visita_social: false,
-    cids: '', observacoes: '',
+    cids: '', observacoes: '', status: 'ATIVO',
     folder_id: '', ubs_id: '',
     relatorio_medico: false, relatorio_nutricional: false, 
     peso: '', altura: '', nome_profissional: '', registro_profissional: '',
@@ -84,6 +84,7 @@ export function PatientRegistrationForm() {
         data_nascimento: data.data_nascimento ? new Date(data.data_nascimento).toISOString().split('T')[0] : '',
         endereco: data.endereco || '',
         bairro: data.bairro || '',
+        status: data.status || 'ATIVO',
         ubs_id: data.ubs_id ? data.ubs_id.toString() : '',
         folder_id: data.folder_id ? data.folder_id.toString() : '',
         cids: data.cids || '',
@@ -297,9 +298,25 @@ export function PatientRegistrationForm() {
           {/* 1. Dados Pessoais */}
           <div className="space-y-4">
             <h3 className="text-lg font-semibold text-gray-700 border-l-4 border-blue-500 pl-2">1. Dados Pessoais</h3>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Nome Completo</label>
-              <input type="text" name="nome" value={formData.nome} onChange={handleInputChange} required className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ex: João da Silva"/>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="md:col-span-3">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nome Completo</label>
+                <input type="text" name="nome" value={formData.nome} onChange={handleInputChange} required className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ex: João da Silva"/>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                <select 
+                  name="status" 
+                  value={formData.status} 
+                  onChange={handleInputChange} 
+                  className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold ${formData.status === 'ATIVO' ? 'text-green-700' : formData.status === 'PENDENTE' ? 'text-orange-600' : 'text-gray-500'}`}
+                >
+                  <option value="ATIVO">ATIVO</option>
+                  <option value="PENDENTE">PENDENTE</option>
+                  <option value="FALECIDO">FALECIDO</option>
+                  <option value="INATIVO">INATIVO</option>
+                </select>
+              </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>

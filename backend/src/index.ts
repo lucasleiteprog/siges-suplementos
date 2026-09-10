@@ -475,7 +475,42 @@ app.post('/api/dispense', async (req, res) => {
 });
 
 // ==========================================
-// DASHBOARD (ESTATÍSTICAS)
+// CONFIGURAÇÕES GERAIS
+// ==========================================
+app.get('/api/settings', async (req, res) => {
+  try {
+    let settings = await prisma.systemSettings.findFirst();
+    if (!settings) {
+      settings = await prisma.systemSettings.create({ data: {} });
+    }
+    res.json(settings);
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao buscar configurações' });
+  }
+});
+
+app.put('/api/settings', async (req, res) => {
+  try {
+    const { dias_validade_relatorio, dias_aviso_renovacao } = req.body;
+    let settings = await prisma.systemSettings.findFirst();
+    if (settings) {
+      settings = await prisma.systemSettings.update({
+        where: { id: settings.id },
+        data: { dias_validade_relatorio, dias_aviso_renovacao }
+      });
+    } else {
+      settings = await prisma.systemSettings.create({
+        data: { dias_validade_relatorio, dias_aviso_renovacao }
+      });
+    }
+    res.json(settings);
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao salvar configurações' });
+  }
+});
+
+// ==========================================
+// DASHBOARD (Métricas e Alertas)
 // ==========================================
 app.get('/api/dashboard', async (req, res) => {
   try {
@@ -485,8 +520,9 @@ app.get('/api/dashboard', async (req, res) => {
 
     const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
 
-    // 1. Total de pacientes cadastrados
-    const totalPatients = await prisma.patient.count();
+    const pacientes_ativos = await prisma.patient.count({ where: { status: 'ATIVO' } });
+    const pacientes_pendentes = await prisma.patient.count({ where: { status: 'PENDENTE' } });
+    const pacientes_falecidos = await prisma.patient.count({ where: { status: 'FALECIDO' } });
 
     // 2. Fórmulas cadastradas
     const totalFormulas = await prisma.formula.count();
@@ -541,7 +577,10 @@ app.get('/api/dashboard', async (req, res) => {
     });
 
     res.status(200).json({
-      totalPatients,
+      totalPatients: pacientes_ativos,
+      pacientes_ativos,
+      pacientes_pendentes,
+      pacientes_falecidos,
       totalFormulas,
       expiringBatches,
       emptyBatches,

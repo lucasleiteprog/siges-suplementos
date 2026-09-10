@@ -98,6 +98,7 @@ model Patient {
   quantidade            Int?
   data_entrega          DateTime?
   data_ultimo_relatorio DateTime?
+  status                String              @default("ATIVO") // ATIVO, PENDENTE, FALECIDO, INATIVO
   created_at            DateTime            @default(now())
   history               DispensingHistory[]
 }
@@ -111,6 +112,14 @@ model DispensingHistory {
   quem_recebeu           String
   data_dispensacao       DateTime     @default(now())
   observacoes            String?
+  aviso_renovacao_ciente Boolean      @default(false)
   patient                Patient      @relation(fields: [patient_id], references: [id])
   batch                  Batch        @relation(fields: [batch_id], references: [id])
+}
+
+model SystemSettings {
+  id                      Int      @id @default(autoincrement())
+  dias_validade_relatorio Int      @default(90)
+  dias_aviso_renovacao    Int      @default(30) // Quantos dias antes do vencimento deve começar a avisar
+  updated_at              DateTime @updatedAt
 }
