@@ -167,15 +167,15 @@ export function Dispensing() {
               history.map(h => (
                 <tr key={h.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {new Date(h.data_entrega).toLocaleDateString()} {new Date(h.data_entrega).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                    {new Date(h.data_dispensacao).toLocaleDateString()} {new Date(h.data_dispensacao).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                   </td>
                   <td className="px-6 py-4 text-sm font-medium text-gray-900">
                     {h.patient.nome}
                     <div className="text-xs text-gray-500 font-normal">CPF: {h.patient.cpf}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    <span className="font-semibold text-blue-700">{h.quantidade_entregue} latas</span>
-                    <div className="text-xs text-gray-600">{h.formula.nome}</div>
+                    <span className="font-semibold text-blue-700">{h.quantidade} latas</span>
+                    <div className="text-xs text-gray-600">{h.batch?.formula?.nome}</div>
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-500">
                     {h.quem_entregou || '-'}

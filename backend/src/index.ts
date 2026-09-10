@@ -387,11 +387,11 @@ app.post('/api/patients', async (req, res) => {
 app.get('/api/dispense', async (req, res) => {
   try {
     const history = await prisma.dispensingHistory.findMany({
-      orderBy: { data_entrega: 'desc' },
+      orderBy: { data_dispensacao: 'desc' },
       take: 50,
       include: {
         patient: { select: { nome: true, cpf: true } },
-        formula: { select: { nome: true } },
+        batch: { include: { formula: { select: { nome: true } } } },
       }
     });
     res.json(history);
