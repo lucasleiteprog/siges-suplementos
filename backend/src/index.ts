@@ -384,6 +384,21 @@ app.post('/api/patients', async (req, res) => {
 // ==========================================
 // DISPENSAÇÃO (ENTREGA FEFO)
 // ==========================================
+app.get('/api/dispense', async (req, res) => {
+  try {
+    const history = await prisma.dispensingHistory.findMany({
+      orderBy: { data_entrega: 'desc' },
+      take: 50,
+      include: {
+        patient: { select: { nome: true, cpf: true } },
+        formula: { select: { nome: true } },
+      }
+    });
+    res.json(history);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Erro ao buscar histórico', details: error.message });
+  }
+});
 app.post('/api/dispense', async (req, res) => {
   const { patient_id, formula_id, quantidade_solicitada, observacoes, quem_entregou, quem_recebeu } = req.body;
 
