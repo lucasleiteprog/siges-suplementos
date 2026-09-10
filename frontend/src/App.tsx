@@ -20,8 +20,8 @@ function App() {
 
   const getNavClass = (path: string) => {
     return location.pathname === path || (path === '/pacientes/novo' && location.pathname.includes('/pacientes/'))
-      ? "bg-blue-800 text-white flex items-center px-4 py-3 text-sm font-medium rounded-md"
-      : "text-blue-100 hover:bg-blue-800 hover:text-white flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors";
+      ? "bg-blue-800 text-white flex items-center px-4 py-2 text-sm font-medium rounded-md"
+      : "text-blue-100 hover:bg-blue-800 hover:text-white flex items-center px-4 py-2 text-sm font-medium rounded-md transition-colors";
   };
 
   const isAdmin = user.role === 'ADMIN';
@@ -35,12 +35,12 @@ function App() {
           <p className="text-blue-300 text-xs mt-1">Gestão de Suplementos</p>
         </div>
         
-        <nav className="flex-1 px-3 py-6 space-y-2 overflow-y-auto">
+        <nav className="flex-1 px-3 py-6 space-y-1 overflow-y-auto scrollbar-hide">
           <Link to="/" className={getNavClass('/')}>
             <LayoutDashboard className="w-5 h-5 mr-3 opacity-90" />
             Dashboard
           </Link>
-          <div className="pt-4 pb-2">
+          <div className="pt-3 pb-1">
             <p className="px-4 text-xs font-semibold text-blue-400 uppercase tracking-wider">
               Pacientes
             </p>
@@ -49,7 +49,7 @@ function App() {
             <Users className="w-5 h-5 mr-3 opacity-90" />
             Consultar e Cadastrar
           </Link>
-          <div className="pt-4 pb-2">
+          <div className="pt-3 pb-1">
             <p className="px-4 text-xs font-semibold text-blue-400 uppercase tracking-wider">
               Dispensação
             </p>
@@ -58,7 +58,7 @@ function App() {
             <Truck className="w-5 h-5 mr-3 opacity-90" />
             Nova Entrega
           </Link>
-          <div className="pt-4 pb-2">
+          <div className="pt-3 pb-1">
             <p className="px-4 text-xs font-semibold text-blue-400 uppercase tracking-wider">
               Estoque
             </p>
@@ -70,7 +70,7 @@ function App() {
           
           {(user.perm_listas_base || user.perm_usuarios) && (
             <>
-              <div className="pt-4 pb-2">
+              <div className="pt-3 pb-1">
                 <p className="px-4 text-xs font-semibold text-blue-400 uppercase tracking-wider">
                   Administração
                 </p>
