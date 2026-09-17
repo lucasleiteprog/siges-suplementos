@@ -142,7 +142,7 @@ export function Dashboard() {
               <Clock className="w-5 h-5 text-gray-600 mr-2" />
               <h3 className="font-bold text-gray-800">Últimas Dispensações</h3>
             </div>
-            <Link to="/entregas" className="text-sm text-blue-600 font-medium hover:underline">Nova Entrega</Link>
+            <Link to="/dispensacao" className="text-sm text-blue-600 font-medium hover:underline">Nova Entrega</Link>
           </div>
           <div className="p-0 flex-1">
             {data.recentDispensing.length > 0 ? (
