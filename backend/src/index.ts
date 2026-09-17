@@ -198,8 +198,10 @@ app.put('/api/batches/:id', async (req, res) => {
     const batch = await prisma.batch.update({
       where: { id: parseInt(req.params.id) },
       data: {
+        formulaId: parseInt(data.formulaId),
         numero_lote: data.numero_lote,
         data_validade: new Date(data.data_validade),
+        quantidade_inicial: parseInt(data.quantidade_inicial),
         quantidade_atual: parseInt(data.quantidade_atual),
         observacoes: data.observacoes || null
       },
